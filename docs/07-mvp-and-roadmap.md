@@ -271,13 +271,13 @@ These are repeated from `01` §10.2 so that the owner sees them in one place.
 | ID | Question | Needed by |
 |---|---|---|
 | D-01 | Brand identity, categories, first products | Stage 6 (sample data until then) |
-| D-02 | Payment methods at launch (online only recommended) | Stage 3 |
-| D-03 | Delivery model and areas; zone fees | Stage 3 |
+| D-02 | Payment methods at launch | Stage 3 — **decided: Paystack online only** |
+| D-03 | Delivery model and areas; zone fees | Stage 3 — **decided: in-house, Lagos only, two zones (sample fees)** |
 | D-04 | LLM provider and monthly budget | Stage 7 (fake model until then) |
-| D-05 | Auto-confirm after payment, or manual? (auto recommended) | Stage 4 |
+| D-05 | Auto-confirm after payment, or manual? | Stage 4 — **decided: manual staff confirmation** |
 | D-06 | Hosting preference (container host recommended) | Stage 8 (Stage 1 is host-neutral) |
 | D-07 | WhatsApp readiness: Meta verification, number, admins | Stage 7 live use (mock until then) — **start now; it has the longest lead time** |
 | D-08 | Languages (English only recommended for MVP) | Stage 6 |
-| D-09 | Minimum order value; per-item limit (10) | Stage 3 |
+| D-09 | Minimum order value; per-item limit (10) | Stage 3 — **decided: no minimum; limit 10** |
 | D-10 | Customer accounts: OTP only (recommended) | Stage 5 |
 | D-11 | Email at checkout (required by Paystack) | Stage 3 |

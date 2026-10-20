@@ -318,14 +318,14 @@ Rules: only Owner can grant the Owner role. Admin cannot grant Owner. Every role
 | ID | Decision | Options | Default if not decided |
 |---|---|---|---|
 | **D-01** | Brand identity: name, logo, colours, categories, first product set. | Provided by owner | Neutral sample brand, clearly marked as sample data |
-| **D-02** | Payment methods at launch. | (a) Paystack online only · (b) Paystack + pay-on-delivery · (c) Paystack + bank transfer with manual confirmation | (a). Pay-on-delivery would change the state machine (dispatch before payment) and adds cash-reconciliation work. |
-| **D-03** | Delivery model and areas. | In-house riders · courier partner · pickup only | In-house, Lagos only, two zones with sample fees |
+| **D-02** | Payment methods at launch. | (a) Paystack online only · (b) Paystack + pay-on-delivery · (c) Paystack + bank transfer with manual confirmation | **Decided: (a) Paystack online only.** Bank transfer was considered and rejected because a manual confirmation would break the verified-payment rule (principle 2). Pay-on-delivery would change the state machine. |
+| **D-03** | Delivery model and areas. | In-house riders · courier partner · pickup only | **Decided: in-house riders, Lagos only, two zones with sample fees** (fees and ETAs are labelled as estimates). |
 | **D-04** | LLM provider and monthly budget. | Provider choice and a spending cap | Provider adapter with a monthly budget cap; no model chosen yet |
-| **D-05** | Auto-confirm orders after verified payment, or manual confirmation by staff? | Auto · manual | Auto-confirm |
+| **D-05** | Auto-confirm orders after verified payment, or manual confirmation by staff? | Auto · manual | **Decided: manual confirmation by staff.** A verified payment moves the order to `PAYMENT_CONFIRMED`. Staff then move it to `CONFIRMED`; the state machine is unchanged, only the actor for that transition differs. |
 | **D-06** | Hosting preference. | Vercel + managed Postgres + worker · container host (e.g. Render, Railway, Fly) + managed Postgres | Container host with a separate worker (see `02-architecture.md` §9) |
 | **D-07** | WhatsApp readiness: Meta Business verification status, number, and who holds admin access. | Ready · in progress · not started | Mock mode until ready |
 | **D-08** | Languages. | English only · English plus Pidgin or Yoruba copy | English only |
-| **D-09** | Minimum order value and per-item limit. | Values | None; per-item limit 10 |
+| **D-09** | Minimum order value and per-item limit. | Values | **Decided: no minimum order value; per-item limit 10.** |
 | **D-10** | Customer accounts: OTP only, or optional password later? | OTP only · OTP plus password | OTP only |
 | **D-11** | Email at checkout. Paystack requires an email address to initialise a transaction, so WhatsApp-initiated orders must also collect one. | Collect email (required) · use a system placeholder for WhatsApp orders (not recommended: payment receipts would go nowhere and the data would be misleading) | Collect email, required for payment, used for the receipt only. Confirm the privacy wording with counsel. |
 
