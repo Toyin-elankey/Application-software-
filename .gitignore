@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Environment files with real values (.env.example is committed)
+.env
+.env.*
+!.env.example
+
+# Build and tooling output
+dist/
+build/
+.next/
+coverage/
+*.log
+
+# Python tooling
+__pycache__/
+.venv*/

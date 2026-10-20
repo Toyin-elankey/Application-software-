@@ -1,0 +1,17 @@
+{
+  "name": "application-software",
+  "version": "0.0.0-spec",
+  "private": true,
+  "description": "AI-powered WhatsApp e-commerce platform. Currently: specification, data-model draft and spec test suite (no application code yet).",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/spec/spec.test.mjs",
+    "test:report": "python3 scripts/render_test_report.py"
+  },
+  "devDependencies": {
+    "prisma": "7.10.1"
+  },
+  "engines": {
+    "node": ">=20.9"
+  }
+}

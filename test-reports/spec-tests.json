@@ -1,0 +1,129 @@
+{
+  "run": {
+    "branch": "arena/cafce384-application-software",
+    "commit": "36b027f",
+    "node": "v22.22.3",
+    "prisma": "7.10.1",
+    "date": "2026-10-20"
+  },
+  "summary": {
+    "total": 16,
+    "passed": 16,
+    "failed": 0,
+    "duration_ms": 1899.17
+  },
+  "tests": [
+    {
+      "name": "schema: passes prisma validate",
+      "category": "schema",
+      "status": "pass",
+      "duration_ms": 965.79,
+      "error": null
+    },
+    {
+      "name": "schema: is formatted (prisma format --check)",
+      "category": "schema",
+      "status": "pass",
+      "duration_ms": 919.95,
+      "error": null
+    },
+    {
+      "name": "schema: model and enum counts match the README",
+      "category": "schema",
+      "status": "pass",
+      "duration_ms": 0.39,
+      "error": null
+    },
+    {
+      "name": "schema: every model has a primary key",
+      "category": "schema",
+      "status": "pass",
+      "duration_ms": 0.9,
+      "error": null
+    },
+    {
+      "name": "schema: every tenant-owned model relates to Business",
+      "category": "schema",
+      "status": "pass",
+      "duration_ms": 0.4,
+      "error": null
+    },
+    {
+      "name": "schema: money fields are BigInt, never Float or Decimal",
+      "category": "schema",
+      "status": "pass",
+      "duration_ms": 0.45,
+      "error": null
+    },
+    {
+      "name": "schema: idempotency and duplicate-protection keys exist (docs/03 \u00a75)",
+      "category": "schema",
+      "status": "pass",
+      "duration_ms": 0.34,
+      "error": null
+    },
+    {
+      "name": "schema: order lifecycle enum has all eleven states from the PRD \u00a77",
+      "category": "schema",
+      "status": "pass",
+      "duration_ms": 0.41,
+      "error": null
+    },
+    {
+      "name": "docs: every relative markdown link resolves",
+      "category": "docs",
+      "status": "pass",
+      "duration_ms": 2.61,
+      "error": null
+    },
+    {
+      "name": "docs: explicit cross-document section references resolve",
+      "category": "docs",
+      "status": "pass",
+      "duration_ms": 5.98,
+      "error": null
+    },
+    {
+      "name": "PRD: requirement ids are unique",
+      "category": "PRD",
+      "status": "pass",
+      "duration_ms": 0.55,
+      "error": null
+    },
+    {
+      "name": "PRD: every requirement row has a priority of M, S or C",
+      "category": "PRD",
+      "status": "pass",
+      "duration_ms": 0.44,
+      "error": null
+    },
+    {
+      "name": "env: .env.example contains no real-looking secrets",
+      "category": "env",
+      "status": "pass",
+      "duration_ms": 0.56,
+      "error": null
+    },
+    {
+      "name": "env: .env is ignored by git and .env.example is not",
+      "category": "env",
+      "status": "pass",
+      "duration_ms": 0.14,
+      "error": null
+    },
+    {
+      "name": "status: roadmap says application code is not started while src/ is absent",
+      "category": "status",
+      "status": "pass",
+      "duration_ms": 0.16,
+      "error": null
+    },
+    {
+      "name": "status: README does not claim a runnable application",
+      "category": "status",
+      "status": "pass",
+      "duration_ms": 0.1,
+      "error": null
+    }
+  ]
+}

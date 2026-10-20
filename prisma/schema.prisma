@@ -250,29 +250,33 @@ model Business {
   createdAt   DateTime @default(now()) @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @db.Timestamptz(6)
 
-  settings          BusinessSettings?
-  memberships       StaffMembership[]
-  customers         Customer[]
-  categories        Category[]
-  products          Product[]
-  variants          ProductVariant[]
-  deliveryZones     DeliveryZone[]
-  carts             Cart[]
-  orders            Order[]
-  payments          Payment[]
-  refunds           Refund[]
-  conversations     Conversation[]
-  whatsappAccount   WhatsAppAccount?
-  messageTemplates  MessageTemplate[]
-  notifications     WhatsAppNotification[]
-  consents          ConsentRecord[]
-  addresses         Address[]
-  otpChallenges     OtpChallenge[]
-  idempotencyKeys   IdempotencyKey[]
-  confirmations     ConfirmationRequest[]
-  auditLogs         AuditLog[]
-  aiToolInvocations AiToolInvocation[]
-  webhookEvents     WebhookEvent[]
+  settings           BusinessSettings?
+  memberships        StaffMembership[]
+  customers          Customer[]
+  categories         Category[]
+  products           Product[]
+  variants           ProductVariant[]
+  deliveryZones      DeliveryZone[]
+  carts              Cart[]
+  orders             Order[]
+  payments           Payment[]
+  refunds            Refund[]
+  conversations      Conversation[]
+  whatsappAccount    WhatsAppAccount?
+  messageTemplates   MessageTemplate[]
+  notifications      WhatsAppNotification[]
+  consents           ConsentRecord[]
+  addresses          Address[]
+  otpChallenges      OtpChallenge[]
+  idempotencyKeys    IdempotencyKey[]
+  confirmations      ConfirmationRequest[]
+  auditLogs          AuditLog[]
+  aiToolInvocations  AiToolInvocation[]
+  webhookEvents      WebhookEvent[]
+  inventoryMovements InventoryMovement[]
+  shipments          Shipment[]
+  deliveryEvents     DeliveryEvent[]
+  jobs               Job[]
 }
 
 model BusinessSettings {
@@ -580,6 +584,7 @@ model InventoryMovement {
   variant    ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
   order      Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
   actorStaff StaffUser?     @relation(fields: [actorStaffId], references: [id], onDelete: SetNull)
+  business   Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([variantId, createdAt])
   @@index([orderId])
@@ -813,8 +818,9 @@ model Shipment {
   createdAt      DateTime             @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime             @updatedAt @db.Timestamptz(6)
 
-  order  Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  events DeliveryEvent[]
+  order    Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  events   DeliveryEvent[]
+  business Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
 }
@@ -835,6 +841,7 @@ model DeliveryEvent {
 
   shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
   order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([orderId, occurredAt])
 }
@@ -993,6 +1000,7 @@ model Job {
   lastError   String?   @db.VarChar(500)
   createdAt   DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+  business    Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
 
   @@index([status, runAt])
 }
