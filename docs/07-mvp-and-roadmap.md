@@ -82,6 +82,11 @@ Each stage ends with a merge to the working branch and passing CI. Sizes are rel
 - Secret scanning in CI.
 - **Exit:** `npm run dev` shows a placeholder storefront from the container; CI is green on a clean checkout.
 
+**Status (Stage 1):** built on `arena/ca7870ef-application-software` (PR #3). CI passed on commit `ab08636` for every job: lint, typecheck, spec and unit tests, Prisma validation, build, Playwright end-to-end tests on Chromium, Docker image build, and gitleaks secret scan.
+- Checked locally: `npm run check` passes; the production server returns 200 from `/api/health` with `no-store`; an invalid `APP_BASE_URL` in production stops the process with exit code 1.
+- Not checked: `docker compose up` (Docker is not available in the sandbox); the Dockerfile is only proven by the CI image build.
+- Deviation: the Dockerfile builds the web app only. The worker image comes with the job queue (Stage 4/5).
+
 ### Stage 2 — Data layer (M)
 
 - Baseline migration from the schema; hand-written SQL from `03` §9 added as a second migration; tests that assert each CHECK, unique index and FTS column exists and rejects bad data.
