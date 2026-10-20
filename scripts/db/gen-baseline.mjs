@@ -276,7 +276,9 @@ export function generateSql(parsed) {
         if (f.default !== undefined && f.default.trim() !== '[]') {
           throw new Error(`${model.name}.${f.name}: unsupported list default ${f.default}`);
         }
-        cols.push(`${q(f.name)} TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]`);
+        // Prisma adds a column default only when the schema declares @default([]).
+        const dflt = f.default !== undefined ? ' DEFAULT ARRAY[]::TEXT[]' : '';
+        cols.push(`${q(f.name)} TEXT[] NOT NULL${dflt}`);
         continue;
       }
       const parts = [q(f.name), columnType(f)];

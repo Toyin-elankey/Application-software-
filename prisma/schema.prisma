@@ -594,7 +594,7 @@ model DeliveryZone {
   id                         String   @id @default(uuid()) @db.Uuid
   businessId                 String   @db.Uuid
   name                       String   @db.VarChar(80)
-  states                     String[] // Nigerian states covered by this zone
+  states                     String[] @default([]) // Nigerian states covered by this zone
   feeMinor                   BigInt
   freeShippingThresholdMinor BigInt?
   etaLabel                   String?  @db.VarChar(120) // business-configured ESTIMATE, labelled as such
