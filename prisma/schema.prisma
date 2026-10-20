@@ -811,6 +811,7 @@ model Refund {
   reason             String       @db.VarChar(255)
   status             RefundStatus @default(PENDING)
   providerRefundId   String?      @unique @db.VarChar(100)
+  failureReason      String?      @db.VarChar(255)
   requestedByStaffId String?      @db.Uuid
   approvedByStaffId  String?      @db.Uuid
   processedAt        DateTime?    @db.Timestamptz(6)

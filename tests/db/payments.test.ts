@@ -43,6 +43,14 @@ class FakePaystack implements PaymentProvider {
     return { authorizationUrl: `https://checkout.paystack.test/${input.reference}`, providerReference: input.reference };
   }
 
+  async refund(): Promise<never> {
+    throw new Error('refunds are not used in this test');
+  }
+
+  async getRefund(): Promise<never> {
+    throw new Error('refunds are not used in this test');
+  }
+
   async verify(reference: string): Promise<VerifiedTransaction> {
     this.calls.set(reference, (this.calls.get(reference) ?? 0) + 1);
     const step = this.scripts.get(reference)?.shift();

@@ -24,10 +24,17 @@ export type VerifiedTransaction = {
   paidAt?: Date;
 };
 
+/** Refund states as the provider reports them. PENDING and PROCESSING are not final. */
+export type RefundOutcome = 'PENDING' | 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
+
 export interface PaymentProvider {
   readonly name: ProviderName;
   initialize(input: InitializeInput): Promise<{ authorizationUrl: string; providerReference: string }>;
   verify(reference: string): Promise<VerifiedTransaction>;
+  /** Asks the provider to refund part or all of a successful transaction. Final state comes later, by webhook or getRefund. */
+  refund(input: { providerTransactionId: string; amountMinor: bigint; reference: string }): Promise<{ providerRefundId: string; status: RefundOutcome }>;
+  /** Reads the current state of a refund. Used to confirm webhooks and to sweep refunds that never settled. */
+  getRefund(providerRefundId: string): Promise<{ providerRefundId: string; status: RefundOutcome }>;
 }
 
 /**

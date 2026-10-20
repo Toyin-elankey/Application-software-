@@ -201,3 +201,49 @@ describe('Paystack configuration (06 §7)', () => {
     }
   });
 });
+
+describe('PaystackProvider refunds', () => {
+  it('starts a refund and maps the queued status to PROCESSING', async () => {
+    const { fetchFn, calls } = replay([{ status: 200, body: { status: true, data: { id: 3018284, status: 'pending' } } }]);
+    const provider = new PaystackProvider({ secretKey: SECRET, fetch: fetchFn });
+    const result = await provider.refund({ providerTransactionId: '1004723697', amountMinor: 10000n, reference: 'ref' });
+    expect(result).toEqual({ providerRefundId: '3018284', status: 'PENDING' });
+    expect(calls[0].url).toBe('https://api.paystack.co/refund');
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ transaction: '1004723697', amount: 10000 });
+  });
+
+  it('looks up one refund by id and maps processed to SUCCEEDED', async () => {
+    const { fetchFn, calls } = replay([{ status: 200, body: { status: true, data: { id: 3018284, status: 'processed' } } }]);
+    const provider = new PaystackProvider({ secretKey: SECRET, fetch: fetchFn });
+    expect(await provider.getRefund('3018284')).toEqual({ providerRefundId: '3018284', status: 'SUCCEEDED' });
+    expect(calls[0].url).toBe('https://api.paystack.co/refund/3018284');
+    expect(calls[0].init.method).toBe('GET');
+  });
+
+  it('keeps needs-attention and unknown statuses open rather than final', async () => {
+    const provider = new PaystackProvider({
+      secretKey: SECRET,
+      fetch: replay([{ status: 200, body: { status: true, data: { id: 7, status: 'needs-attention' } } }]).fetchFn,
+    });
+    expect((await provider.getRefund('7')).status).toBe('PROCESSING');
+  });
+
+  it('refuses a lookup whose id does not match the one asked for', async () => {
+    const provider = new PaystackProvider({
+      secretKey: SECRET,
+      fetch: replay([{ status: 200, body: { status: true, data: { id: 999, status: 'processed' } } }]).fetchFn,
+    });
+    await expect(provider.getRefund('7')).rejects.toMatchObject({ retryable: true });
+  });
+
+  it('treats a 4xx on refund as definitive (not retryable)', async () => {
+    const provider = new PaystackProvider({
+      secretKey: SECRET,
+      fetch: replay([{ status: 400, body: { status: false, message: 'Transaction not found' } }]).fetchFn,
+    });
+    await expect(provider.refund({ providerTransactionId: '1', amountMinor: 1n, reference: 'r' })).rejects.toMatchObject({
+      retryable: false,
+      httpStatus: 400,
+    });
+  });
+});

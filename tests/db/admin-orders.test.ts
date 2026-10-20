@@ -32,6 +32,12 @@ const startOnly: PaymentProvider = {
   async initialize(input: InitializeInput) {
     return { authorizationUrl: `https://checkout.paystack.test/${input.reference}`, providerReference: input.reference };
   },
+  async refund(): Promise<never> {
+    throw new Error('refunds are not used in this test');
+  },
+  async getRefund(): Promise<never> {
+    throw new Error('refunds are not used in this test');
+  },
   async verify(): Promise<VerifiedTransaction> {
     throw new Error('not used in these tests');
   },
@@ -203,16 +209,17 @@ describe('fulfilment moves', () => {
     ).rejects.toMatchObject({ status: 422, code: 'transition_not_available' });
   });
 
-  it('refund moves are not offered here: a paid order cannot be cancelled or refunded by this endpoint', async () => {
+  it('a paid order cannot be cancelled through this endpoint; a refund move needs a reason', async () => {
     const order = await paidOrder();
     const owner = await staffActor('OWNER', order.businessId);
     const before = await orderRow(order.orderId);
     await expect(
       transitionOrderForStaff(db, owner, { orderId: order.orderId, expectedVersion: before.version, to: 'CANCELLED', reason: 'changed mind' }),
     ).rejects.toMatchObject({ status: 422, code: 'transition_not_available' });
+    // A refund move is allowed for the role, but it needs a reason (the refund trail).
     await expect(
       transitionOrderForStaff(db, owner, { orderId: order.orderId, expectedVersion: before.version, to: 'REFUND_PENDING', reason: null }),
-    ).rejects.toMatchObject({ status: 422 });
+    ).rejects.toMatchObject({ status: 422, code: 'reason_required' });
   });
 });
 

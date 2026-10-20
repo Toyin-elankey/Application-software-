@@ -28,6 +28,9 @@ const EnvSchema = z
     // Encrypts TOTP secrets for staff MFA (AES-256-GCM, key derived with HKDF). Required in production
     // before any MFA enrolment; the MFA routes answer 503 without it rather than storing secrets in clear.
     SESSION_ENCRYPTION_KEY: z.string().min(32, { error: 'must be at least 32 characters when set' }).optional(),
+    // Refunds above this amount (kobo, integer) need a second person to approve them (06 §4.6). Unset means
+    // the default of ₦50,000. The business sets the real value; see docs/06 §4.6.
+    REFUND_APPROVAL_THRESHOLD_MINOR: z.string().regex(/^\d{1,15}$/, { error: 'must be a whole number of kobo' }).optional(),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && !isSecureOrLocal(env.APP_BASE_URL)) {
