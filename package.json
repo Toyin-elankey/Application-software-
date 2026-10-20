@@ -2,14 +2,42 @@
   "name": "application-software",
   "version": "0.0.0-spec",
   "private": true,
-  "description": "AI-powered WhatsApp e-commerce platform. Currently: specification, data-model draft and spec test suite (no application code yet).",
+  "description": "AI-powered WhatsApp e-commerce platform. Stage 1: Next.js scaffold with placeholder storefront, health check, and spec test suite.",
   "type": "module",
   "scripts": {
-    "test": "node --test tests/spec/spec.test.mjs",
-    "test:report": "python3 scripts/render_test_report.py"
+    "dev": "next dev -H 0.0.0.0 -p 3000",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0 -p 3000",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test:spec && npm run test:unit",
+    "test:spec": "node --test tests/spec/spec.test.mjs",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
+    "test:report": "python3 scripts/render_test_report.py",
+    "prisma:validate": "prisma validate",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run prisma:validate && npm run build"
+  },
+  "dependencies": {
+    "next": "16.4.2",
+    "pino": "10.4.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "prisma": "7.10.1"
+    "@playwright/test": "1.64.1",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.4.2",
+    "postcss": "8.5.6",
+    "prisma": "7.10.1",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "vitest": "5.0.5"
   },
   "engines": {
     "node": ">=20.9"
