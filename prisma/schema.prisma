@@ -1,0 +1,1084 @@
+// =============================================================================
+// PROPOSED MVP DATA MODEL — DRAFT FOR REVIEW (Phase 2). NOT YET MIGRATED.
+// See docs/03-data-model.md for rationale, state machines and constraints that
+// Prisma cannot express (CHECK constraints, partial indexes, tsvector) — those
+// are added in hand-written SQL migrations during Stage 2.
+//
+// Conventions
+//  - Money: BigInt in the smallest currency unit (kobo for NGN). Never Float.
+//  - Every business-owned row carries businessId. Every query must filter on it.
+//  - Timestamps are UTC (timestamptz). Display in Africa/Lagos (WAT, UTC+1).
+//  - Secrets (payment keys, WhatsApp access token, App Secret, LLM API key) are
+//    NEVER stored in this database. They live in the host's secret store.
+//  - Card data is never stored. Only provider references and safe metadata.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7: connection URLs live in prisma.config.ts (Migrate) and the
+// PrismaClient adapter (runtime) — not in this file.
+datasource db {
+  provider = "postgresql"
+}
+
+// ----------------------------------------------------------------------------
+// Enums
+// ----------------------------------------------------------------------------
+
+enum StaffRole {
+  OWNER
+  ADMIN
+  MANAGER
+  FULFILMENT
+  SUPPORT
+  FINANCE
+  VIEWER
+}
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+// Single customer-visible lifecycle. Transitions are enforced in code
+// (src/modules/orders/stateMachine.ts) and recorded in OrderStatusEvent.
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAYMENT_CONFIRMED
+  CONFIRMED
+  PROCESSING
+  READY_FOR_DISPATCH
+  DISPATCHED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  REFUND_PENDING
+  REFUNDED
+}
+
+enum SalesChannel {
+  WEB
+  WHATSAPP
+  AI_ASSISTANT
+  ADMIN
+}
+
+enum PaymentProvider {
+  MOCK
+  PAYSTACK
+  FLUTTERWAVE
+}
+
+enum PaymentStatus {
+  INITIALIZED
+  PENDING
+  SUCCEEDED
+  FAILED
+  ABANDONED
+}
+
+enum RefundStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+}
+
+enum InventoryReason {
+  RESTOCK
+  ADJUSTMENT
+  RESERVED
+  RESERVATION_RELEASED
+  SOLD
+  RETURNED
+}
+
+enum CartStatus {
+  ACTIVE
+  CONVERTED
+  ABANDONED
+}
+
+enum ActorType {
+  SYSTEM
+  STAFF
+  CUSTOMER
+  AI
+  WEBHOOK
+}
+
+enum ConversationChannel {
+  WEB_CHAT
+  WHATSAPP
+}
+
+enum ConversationMode {
+  AI
+  HUMAN
+  CLOSED
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageDeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum NotificationType {
+  ORDER_CONFIRMED
+  PAYMENT_RECEIVED
+  ORDER_STATUS_UPDATE
+  DELIVERY_UPDATE
+  REFUND_UPDATE
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  SKIPPED_NO_CONSENT
+  CANCELLED
+}
+
+enum TemplateCategory {
+  UTILITY
+  AUTHENTICATION
+  MARKETING
+}
+
+enum TemplateStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAUSED
+  DISABLED
+}
+
+enum ConsentPurpose {
+  ORDER_UPDATES_WHATSAPP
+  MARKETING_WHATSAPP
+  AI_ASSISTANT_PROCESSING
+  TERMS_AND_PRIVACY
+}
+
+enum OtpPurpose {
+  CUSTOMER_LOGIN
+  ORDER_LOOKUP
+}
+
+enum DeliveryEventStatus {
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERY_ATTEMPTED
+  DELIVERED
+  RETURNED
+  DELAYED
+  NOTE
+}
+
+enum DeliveryEventSource {
+  STAFF
+  PROVIDER
+}
+
+enum EstimateSource {
+  PROVIDER
+  BUSINESS_CONFIGURED
+  NONE
+}
+
+enum WebhookProvider {
+  WHATSAPP
+  PAYSTACK
+  FLUTTERWAVE
+}
+
+enum WebhookStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+  IGNORED
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum IdempotencyState {
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ConfirmationAction {
+  CHECKOUT
+}
+
+enum AiToolStatus {
+  OK
+  ERROR
+  DENIED
+}
+
+// ----------------------------------------------------------------------------
+// Tenancy, settings, staff
+// ----------------------------------------------------------------------------
+
+model Business {
+  id          String   @id @default(uuid()) @db.Uuid
+  slug        String   @unique @db.VarChar(64)
+  name        String   @db.VarChar(120)
+  countryCode String   @default("NG") @db.Char(2)
+  currency    String   @default("NGN") @db.Char(3)
+  timezone    String   @default("Africa/Lagos") @db.VarChar(64)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  settings          BusinessSettings?
+  memberships       StaffMembership[]
+  customers         Customer[]
+  categories        Category[]
+  products          Product[]
+  variants          ProductVariant[]
+  deliveryZones     DeliveryZone[]
+  carts             Cart[]
+  orders            Order[]
+  payments          Payment[]
+  refunds           Refund[]
+  conversations     Conversation[]
+  whatsappAccount   WhatsAppAccount?
+  messageTemplates  MessageTemplate[]
+  notifications     WhatsAppNotification[]
+  consents          ConsentRecord[]
+  addresses         Address[]
+  otpChallenges     OtpChallenge[]
+  idempotencyKeys   IdempotencyKey[]
+  confirmations     ConfirmationRequest[]
+  auditLogs         AuditLog[]
+  aiToolInvocations AiToolInvocation[]
+  webhookEvents     WebhookEvent[]
+}
+
+model BusinessSettings {
+  businessId String   @id @db.Uuid
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  // Storefront branding (URLs to logo assets; colours as #RRGGBB)
+  brandLogoUrl String? @db.VarChar(500)
+  primaryColor String? @db.VarChar(7)
+  accentColor  String? @db.VarChar(7)
+  tagline      String? @db.VarChar(160)
+
+  // Contact & public policies (shown to customers and the AI assistant)
+  supportEmail          String? @db.VarChar(254)
+  supportPhoneE164      String? @db.VarChar(16)
+  whatsappDisplayNumber String? @db.VarChar(20)
+  addressText           String? @db.VarChar(300)
+  deliveryPolicy        String? @db.Text
+  returnPolicy          String? @db.Text
+  refundPolicy          String? @db.Text
+  privacyPolicyUrl      String? @db.VarChar(500)
+
+  // Commercial rules
+  pricesIncludeVat        Boolean @default(true)
+  vatRateBps              Int     @default(750) // basis points: 750 = 7.5%
+  stockReservationMinutes Int     @default(30)
+  orderNumberPrefix       String  @default("ORD") @db.VarChar(8)
+
+  // Feature switches & preferences
+  aiAssistantEnabled      Boolean @default(true)
+  businessHours           Json?
+  notificationPreferences Json    @default("{}")
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+}
+
+model StaffUser {
+  id               String    @id @default(uuid()) @db.Uuid
+  email            String    @unique @db.VarChar(254)
+  fullName         String    @db.VarChar(120)
+  passwordHash     String    @db.VarChar(255) // Argon2id; never returned by any API
+  tokenVersion     Int       @default(0) // bump to revoke all sessions
+  mfaEnabled       Boolean   @default(false)
+  mfaSecretEnc     String?   @db.VarChar(512) // encrypted TOTP secret (Stage 5)
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime? @db.Timestamptz(6)
+  isActive         Boolean   @default(true)
+  lastLoginAt      DateTime? @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @db.Timestamptz(6)
+
+  memberships           StaffMembership[]
+  assignedConversations Conversation[]
+  inventoryMovements    InventoryMovement[]
+}
+
+model StaffMembership {
+  id          String    @id @default(uuid()) @db.Uuid
+  businessId  String    @db.Uuid
+  staffUserId String    @db.Uuid
+  role        StaffRole
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+
+  business  Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  staffUser StaffUser @relation(fields: [staffUserId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, staffUserId])
+  @@index([staffUserId])
+}
+
+// ----------------------------------------------------------------------------
+// Customers, identity, consent, addresses
+// ----------------------------------------------------------------------------
+
+model Customer {
+  id              String    @id @default(uuid()) @db.Uuid
+  businessId      String    @db.Uuid
+  phoneE164       String    @db.VarChar(16) // primary identifier, e.g. +2348012345678
+  phoneVerifiedAt DateTime? @db.Timestamptz(6)
+  fullName        String?   @db.VarChar(120)
+  email           String?   @db.VarChar(254)
+  anonymizedAt    DateTime? @db.Timestamptz(6) // set when erased; PII columns nulled
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(6)
+
+  business      Business               @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  sessions      CustomerSession[]
+  addresses     Address[]
+  consents      ConsentRecord[]
+  carts         Cart[]
+  orders        Order[]
+  conversations Conversation[]
+  notifications WhatsAppNotification[]
+
+  @@unique([businessId, phoneE164])
+}
+
+model CustomerSession {
+  id         String    @id @default(uuid()) @db.Uuid
+  customerId String    @db.Uuid
+  tokenHash  String    @unique @db.VarChar(64) // SHA-256 of opaque token; raw token only in cookie
+  expiresAt  DateTime  @db.Timestamptz(6)
+  revokedAt  DateTime? @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+  lastSeenAt DateTime? @db.Timestamptz(6)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+}
+
+model OtpChallenge {
+  id          String     @id @default(uuid()) @db.Uuid
+  businessId  String     @db.Uuid
+  phoneE164   String     @db.VarChar(16)
+  purpose     OtpPurpose
+  codeHash    String     @db.VarChar(64) // HMAC-SHA256 of the code; never plaintext
+  attempts    Int        @default(0)
+  maxAttempts Int        @default(5)
+  expiresAt   DateTime   @db.Timestamptz(6)
+  consumedAt  DateTime?  @db.Timestamptz(6)
+  createdAt   DateTime   @default(now()) @db.Timestamptz(6)
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, phoneE164, purpose, createdAt])
+}
+
+// Append-only. Current consent = latest row per (customerId, purpose).
+model ConsentRecord {
+  id            String         @id @default(uuid()) @db.Uuid
+  businessId    String         @db.Uuid
+  customerId    String         @db.Uuid
+  purpose       ConsentPurpose
+  granted       Boolean
+  source        String         @db.VarChar(64) // e.g. CHECKOUT_FORM, WHATSAPP_REPLY, ADMIN
+  policyVersion String         @db.VarChar(32)
+  createdAt     DateTime       @default(now()) @db.Timestamptz(6)
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, purpose, createdAt])
+}
+
+model Address {
+  id            String   @id @default(uuid()) @db.Uuid
+  businessId    String   @db.Uuid
+  customerId    String   @db.Uuid
+  label         String?  @db.VarChar(40)
+  recipientName String   @db.VarChar(120)
+  phoneE164     String   @db.VarChar(16)
+  line1         String   @db.VarChar(200)
+  line2         String?  @db.VarChar(200)
+  city          String   @db.VarChar(100)
+  state         String   @db.VarChar(60)
+  postalCode    String?  @db.VarChar(20)
+  landmark      String?  @db.VarChar(200)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(6)
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+}
+
+// ----------------------------------------------------------------------------
+// Catalogue & inventory
+// ----------------------------------------------------------------------------
+
+model Category {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @db.Uuid
+  parentId   String?  @db.Uuid
+  name       String   @db.VarChar(80)
+  slug       String   @db.VarChar(80)
+  sortOrder  Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
+
+  business Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@unique([businessId, slug])
+}
+
+model Product {
+  id               String        @id @default(uuid()) @db.Uuid
+  businessId       String        @db.Uuid
+  categoryId       String?       @db.Uuid
+  slug             String        @db.VarChar(120)
+  name             String        @db.VarChar(160)
+  shortDescription String?       @db.VarChar(280)
+  description      String        @db.Text
+  status           ProductStatus @default(DRAFT)
+  attributes       Json          @default("{}") // e.g. {"material":"cotton"} — used by AI compare
+  tags             String[]      @default([])
+  createdAt        DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime      @updatedAt @db.Timestamptz(6)
+  deletedAt        DateTime?     @db.Timestamptz(6)
+
+  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  images   ProductImage[]
+  options  ProductOption[]
+  variants ProductVariant[]
+
+  @@unique([businessId, slug])
+  @@index([businessId, status])
+  @@index([categoryId])
+}
+
+model ProductImage {
+  id        String @id @default(uuid()) @db.Uuid
+  productId String @db.Uuid
+  url       String @db.VarChar(500)
+  altText   String @db.VarChar(200)
+  sortOrder Int    @default(0)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+}
+
+model ProductOption {
+  id        String @id @default(uuid()) @db.Uuid
+  productId String @db.Uuid
+  name      String @db.VarChar(40) // e.g. "Size", "Colour"
+  position  Int    @default(0)
+
+  product Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  values  ProductOptionValue[]
+
+  @@unique([productId, name])
+}
+
+model ProductOptionValue {
+  id       String @id @default(uuid()) @db.Uuid
+  optionId String @db.Uuid
+  value    String @db.VarChar(60) // e.g. "XL", "Black"
+  position Int    @default(0)
+
+  option   ProductOption        @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  variants VariantOptionValue[]
+
+  @@unique([optionId, value])
+}
+
+model ProductVariant {
+  id             String   @id @default(uuid()) @db.Uuid
+  businessId     String   @db.Uuid
+  productId      String   @db.Uuid
+  sku            String   @db.VarChar(64)
+  title          String   @db.VarChar(160) // e.g. "XL / Black" (derived, stored for speed)
+  priceMinor     BigInt // always positive; enforced by CHECK in SQL migration
+  compareAtMinor BigInt?
+  weightGrams    Int?
+  trackInventory Boolean  @default(true)
+  onHand         Int      @default(0) // CHECK onHand >= 0 (SQL)
+  reserved       Int      @default(0) // CHECK 0 <= reserved <= onHand (SQL)
+  isDefault      Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(6)
+
+  business   Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  product    Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  options    VariantOptionValue[]
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+  movements  InventoryMovement[]
+
+  @@unique([businessId, sku])
+  @@index([productId])
+}
+
+model VariantOptionValue {
+  variantId     String @db.Uuid
+  optionValueId String @db.Uuid
+
+  variant     ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  optionValue ProductOptionValue @relation(fields: [optionValueId], references: [id], onDelete: Cascade)
+
+  @@id([variantId, optionValueId])
+  @@index([optionValueId])
+}
+
+// Append-only ledger. onHand/reserved on ProductVariant are the cached balances.
+model InventoryMovement {
+  id           String          @id @default(uuid()) @db.Uuid
+  businessId   String          @db.Uuid
+  variantId    String          @db.Uuid
+  delta        Int // signed quantity change to onHand or reserved (see reason)
+  reason       InventoryReason
+  orderId      String?         @db.Uuid
+  actorType    ActorType
+  actorStaffId String?         @db.Uuid
+  note         String?         @db.VarChar(255)
+  createdAt    DateTime        @default(now()) @db.Timestamptz(6)
+
+  variant    ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  order      Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  actorStaff StaffUser?     @relation(fields: [actorStaffId], references: [id], onDelete: SetNull)
+
+  @@index([variantId, createdAt])
+  @@index([orderId])
+}
+
+model DeliveryZone {
+  id                         String   @id @default(uuid()) @db.Uuid
+  businessId                 String   @db.Uuid
+  name                       String   @db.VarChar(80)
+  states                     String[] // Nigerian states covered by this zone
+  feeMinor                   BigInt
+  freeShippingThresholdMinor BigInt?
+  etaLabel                   String?  @db.VarChar(120) // business-configured ESTIMATE, labelled as such
+  isActive                   Boolean  @default(true)
+  sortOrder                  Int      @default(0)
+  createdAt                  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt                  DateTime @updatedAt @db.Timestamptz(6)
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  orders   Order[]
+
+  @@index([businessId, isActive])
+}
+
+// ----------------------------------------------------------------------------
+// Carts
+// ----------------------------------------------------------------------------
+
+model Cart {
+  id             String       @id @default(uuid()) @db.Uuid
+  businessId     String       @db.Uuid
+  customerId     String?      @db.Uuid
+  conversationId String?      @db.Uuid
+  channel        SalesChannel @default(WEB)
+  tokenHash      String?      @unique @db.VarChar(64) // anonymous cart cookie (hashed)
+  status         CartStatus   @default(ACTIVE)
+  expiresAt      DateTime     @db.Timestamptz(6)
+  createdAt      DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @db.Timestamptz(6)
+
+  business      Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer      Customer?             @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  conversation  Conversation?         @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  items         CartItem[]
+  confirmations ConfirmationRequest[]
+
+  @@index([businessId, status, expiresAt])
+  @@index([customerId])
+}
+
+model CartItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  cartId    String   @db.Uuid
+  variantId String   @db.Uuid
+  quantity  Int // CHECK quantity > 0 AND quantity <= 99 (SQL)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, variantId])
+}
+
+// ----------------------------------------------------------------------------
+// Orders, payments, fulfilment
+// ----------------------------------------------------------------------------
+
+model Order {
+  id                   String       @id @default(uuid()) @db.Uuid
+  businessId           String       @db.Uuid
+  customerId           String       @db.Uuid
+  orderNumber          String       @db.VarChar(20) // human-friendly, e.g. ORD-260001
+  status               OrderStatus  @default(PENDING_PAYMENT)
+  channel              SalesChannel
+  currency             String       @db.Char(3)
+  subtotalMinor        BigInt
+  discountMinor        BigInt       @default(0)
+  shippingMinor        BigInt       @default(0)
+  taxMinor             BigInt       @default(0) // informational: VAT already inside subtotal (pricesIncludeVat)
+  totalMinor           BigInt // CHECK total = subtotal - discount + shipping (SQL). VAT is inside subtotal.
+  deliveryZoneId       String?      @db.Uuid
+  deliveryZoneName     String?      @db.VarChar(80) // snapshot
+  checkoutKey          String       @db.VarChar(128) // idempotency scope: scoped to business
+  checkoutRequestHash  String       @db.VarChar(64)
+  reservationExpiresAt DateTime?    @db.Timestamptz(6)
+  customerNote         String?      @db.VarChar(500)
+  internalNote         String?      @db.Text // staff only; never shown to customers or AI
+  cancelReason         String?      @db.VarChar(255)
+  paidAt               DateTime?    @db.Timestamptz(6)
+  confirmedAt          DateTime?    @db.Timestamptz(6)
+  dispatchedAt         DateTime?    @db.Timestamptz(6)
+  deliveredAt          DateTime?    @db.Timestamptz(6)
+  cancelledAt          DateTime?    @db.Timestamptz(6)
+  version              Int          @default(0) // optimistic locking on every transition
+  createdAt            DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime     @updatedAt @db.Timestamptz(6)
+
+  business           Business               @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer           Customer               @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  deliveryZone       DeliveryZone?          @relation(fields: [deliveryZoneId], references: [id], onDelete: SetNull)
+  address            OrderAddress?
+  items              OrderItem[]
+  statusEvents       OrderStatusEvent[]
+  payments           Payment[]
+  refunds            Refund[]
+  shipments          Shipment[]
+  deliveryEvents     DeliveryEvent[]
+  inventoryMovements InventoryMovement[]
+  notifications      WhatsAppNotification[]
+
+  @@unique([businessId, orderNumber])
+  @@unique([businessId, checkoutKey])
+  @@index([businessId, status, createdAt])
+  @@index([businessId, customerId, createdAt])
+  @@index([status, reservationExpiresAt]) // expiry worker
+}
+
+// Snapshot of the delivery address at checkout. Immutable after creation.
+model OrderAddress {
+  orderId       String  @id @db.Uuid
+  recipientName String  @db.VarChar(120)
+  phoneE164     String  @db.VarChar(16)
+  line1         String  @db.VarChar(200)
+  line2         String? @db.VarChar(200)
+  city          String  @db.VarChar(100)
+  state         String  @db.VarChar(60)
+  postalCode    String? @db.VarChar(20)
+  landmark      String? @db.VarChar(200)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+// Snapshot of products at purchase time. Never re-priced from the catalogue.
+model OrderItem {
+  id             String  @id @default(uuid()) @db.Uuid
+  orderId        String  @db.Uuid
+  variantId      String? @db.Uuid
+  sku            String  @db.VarChar(64)
+  productName    String  @db.VarChar(160)
+  variantTitle   String  @db.VarChar(160)
+  unitPriceMinor BigInt
+  quantity       Int
+  lineTotalMinor BigInt
+
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+}
+
+// Append-only timeline shown to customers (filtered) and staff (full).
+model OrderStatusEvent {
+  id         String       @id @default(uuid()) @db.Uuid
+  orderId    String       @db.Uuid
+  fromStatus OrderStatus?
+  toStatus   OrderStatus
+  actorType  ActorType
+  actorId    String?      @db.VarChar(64)
+  reason     String?      @db.VarChar(255)
+  metadata   Json?
+  createdAt  DateTime     @default(now()) @db.Timestamptz(6)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+model Payment {
+  id                    String          @id @default(uuid()) @db.Uuid
+  businessId            String          @db.Uuid
+  orderId               String          @db.Uuid
+  provider              PaymentProvider
+  reference             String          @unique @db.VarChar(100) // our reference sent to provider
+  providerTransactionId String?         @unique @db.VarChar(100)
+  status                PaymentStatus   @default(INITIALIZED)
+  amountMinor           BigInt
+  currency              String          @db.Char(3)
+  authorizationUrl      String?         @db.VarChar(500)
+  channel               String?         @db.VarChar(30) // e.g. card, bank_transfer (no card data)
+  failureReason         String?         @db.VarChar(255)
+  initializedAt         DateTime        @default(now()) @db.Timestamptz(6)
+  paidAt                DateTime?       @db.Timestamptz(6)
+  verifiedAt            DateTime?       @db.Timestamptz(6)
+  createdAt             DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime        @updatedAt @db.Timestamptz(6)
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  refunds  Refund[]
+
+  @@index([orderId, status])
+  @@index([businessId, status, createdAt])
+}
+
+model Refund {
+  id                 String       @id @default(uuid()) @db.Uuid
+  businessId         String       @db.Uuid
+  paymentId          String       @db.Uuid
+  orderId            String       @db.Uuid
+  amountMinor        BigInt // CHECK > 0; service enforces sum(refunds) <= payment amount
+  reason             String       @db.VarChar(255)
+  status             RefundStatus @default(PENDING)
+  providerRefundId   String?      @unique @db.VarChar(100)
+  requestedByStaffId String?      @db.Uuid
+  approvedByStaffId  String?      @db.Uuid
+  processedAt        DateTime?    @db.Timestamptz(6)
+  createdAt          DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime     @updatedAt @db.Timestamptz(6)
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  payment  Payment  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+}
+
+model Shipment {
+  id             String               @id @default(uuid()) @db.Uuid
+  businessId     String               @db.Uuid
+  orderId        String               @db.Uuid
+  provider       String               @default("MANUAL") @db.VarChar(40)
+  carrierName    String?              @db.VarChar(80)
+  trackingNumber String?              @db.VarChar(80)
+  currentStatus  DeliveryEventStatus?
+  etaFrom        DateTime?            @db.Timestamptz(6)
+  etaTo          DateTime?            @db.Timestamptz(6)
+  etaSource      EstimateSource       @default(NONE)
+  dispatchedAt   DateTime?            @db.Timestamptz(6)
+  deliveredAt    DateTime?            @db.Timestamptz(6)
+  createdAt      DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime             @updatedAt @db.Timestamptz(6)
+
+  order  Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  events DeliveryEvent[]
+
+  @@index([orderId])
+}
+
+// Append-only delivery timeline. Duplicate provider events are blocked by providerEventId.
+model DeliveryEvent {
+  id                String              @id @default(uuid()) @db.Uuid
+  businessId        String              @db.Uuid
+  shipmentId        String              @db.Uuid
+  orderId           String              @db.Uuid
+  status            DeliveryEventStatus
+  description       String?             @db.VarChar(255) // customer-safe text
+  occurredAt        DateTime            @db.Timestamptz(6)
+  source            DeliveryEventSource
+  providerEventId   String?             @unique @db.VarChar(100)
+  recordedByStaffId String?             @db.Uuid
+  createdAt         DateTime            @default(now()) @db.Timestamptz(6)
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, occurredAt])
+}
+
+// ----------------------------------------------------------------------------
+// Conversations (web chat + WhatsApp), messages, WhatsApp configuration
+// ----------------------------------------------------------------------------
+
+model Conversation {
+  id                 String              @id @default(uuid()) @db.Uuid
+  businessId         String              @db.Uuid
+  customerId         String?             @db.Uuid
+  channel            ConversationChannel
+  externalId         String              @db.VarChar(128) // WhatsApp wa_id, or hashed web-chat session id
+  mode               ConversationMode    @default(AI)
+  assignedStaffId    String?             @db.Uuid
+  lastInboundAt      DateTime?           @db.Timestamptz(6) // 24h customer-service window = lastInboundAt + 24h
+  verifiedCustomerId String?             @db.Uuid // set only after OTP verification
+  verifiedUntil      DateTime?           @db.Timestamptz(6)
+  summary            String?             @db.VarChar(1000) // minimised running summary for the AI
+  createdAt          DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime            @updatedAt @db.Timestamptz(6)
+
+  business          Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer          Customer?             @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  assignedTo        StaffUser?            @relation(fields: [assignedStaffId], references: [id], onDelete: SetNull)
+  messages          Message[]
+  carts             Cart[]
+  aiToolInvocations AiToolInvocation[]
+  confirmations     ConfirmationRequest[]
+
+  @@unique([businessId, channel, externalId])
+  @@index([businessId, mode, updatedAt])
+}
+
+model Message {
+  id                String                 @id @default(uuid()) @db.Uuid
+  conversationId    String                 @db.Uuid
+  direction         MessageDirection
+  senderType        ActorType
+  senderStaffId     String?                @db.Uuid
+  providerMessageId String?                @unique @db.VarChar(128) // WhatsApp wamid: dedupes inbound retries
+  kind              String                 @db.VarChar(30) // TEXT, INTERACTIVE_BUTTON, INTERACTIVE_LIST, TEMPLATE, UNSUPPORTED, SYSTEM
+  body              String?                @db.Text // redacted/erased by retention job
+  payload           Json? // interactive ids, template vars (no secrets)
+  deliveryStatus    MessageDeliveryStatus?
+  errorCode         String?                @db.VarChar(30)
+  idempotencyKey    String?                @unique @db.VarChar(128)
+  retentionUntil    DateTime               @db.Timestamptz(6)
+  createdAt         DateTime               @default(now()) @db.Timestamptz(6)
+  statusUpdatedAt   DateTime?              @db.Timestamptz(6)
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([retentionUntil])
+}
+
+// One WhatsApp Business Account per business. Access token is NOT stored here.
+model WhatsAppAccount {
+  id                 String   @id @default(uuid()) @db.Uuid
+  businessId         String   @unique @db.Uuid
+  wabaId             String   @db.VarChar(40)
+  phoneNumberId      String   @unique @db.VarChar(40)
+  displayPhoneNumber String   @db.VarChar(20)
+  verifiedName       String?  @db.VarChar(120)
+  mode               String   @default("MOCK") @db.VarChar(10) // MOCK | LIVE
+  createdAt          DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @db.Timestamptz(6)
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+}
+
+model MessageTemplate {
+  id             String           @id @default(uuid()) @db.Uuid
+  businessId     String           @db.Uuid
+  internalKey    String           @db.VarChar(60) // e.g. order_confirmed — code refers to this key
+  providerName   String           @db.VarChar(120) // exact name registered with Meta
+  language       String           @default("en") @db.VarChar(10)
+  category       TemplateCategory
+  status         TemplateStatus   @default(PENDING)
+  variableSchema Json             @default("[]")
+  createdAt      DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @db.Timestamptz(6)
+
+  business      Business               @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  notifications WhatsAppNotification[]
+
+  @@unique([businessId, internalKey, language])
+}
+
+// Outbox for customer notifications. Deduplicated by dedupeKey, e.g. "ORDER_CONFIRMED:<orderId>".
+model WhatsAppNotification {
+  id                String             @id @default(uuid()) @db.Uuid
+  businessId        String             @db.Uuid
+  customerId        String             @db.Uuid
+  orderId           String?            @db.Uuid
+  templateId        String?            @db.Uuid
+  type              NotificationType
+  status            NotificationStatus @default(PENDING)
+  dedupeKey         String             @unique @db.VarChar(160)
+  attemptCount      Int                @default(0)
+  nextAttemptAt     DateTime           @default(now()) @db.Timestamptz(6)
+  providerMessageId String?            @unique @db.VarChar(128)
+  lastErrorCode     String?            @db.VarChar(30)
+  lastErrorMessage  String?            @db.VarChar(255)
+  createdAt         DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime           @updatedAt @db.Timestamptz(6)
+
+  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  order    Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  template MessageTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([status, nextAttemptAt])
+  @@index([businessId, createdAt])
+}
+
+// ----------------------------------------------------------------------------
+// Platform plumbing: webhooks, jobs, idempotency, confirmations, audit
+// ----------------------------------------------------------------------------
+
+// Inbound webhook inbox. Unique (provider, externalId) = duplicate-event protection.
+model WebhookEvent {
+  id             String          @id @default(uuid()) @db.Uuid
+  businessId     String?         @db.Uuid // resolved after signature/tenant check
+  provider       WebhookProvider
+  externalId     String          @db.VarChar(160) // provider event id, or derived key
+  eventType      String?         @db.VarChar(80)
+  signatureValid Boolean
+  payload        Json // redacted; purged after 30 days
+  status         WebhookStatus   @default(RECEIVED)
+  attempts       Int             @default(0)
+  lastError      String?         @db.VarChar(500)
+  receivedAt     DateTime        @default(now()) @db.Timestamptz(6)
+  processedAt    DateTime?       @db.Timestamptz(6)
+
+  business Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, externalId])
+  @@index([status, receivedAt])
+}
+
+// Generic Postgres-backed job queue (SELECT ... FOR UPDATE SKIP LOCKED).
+model Job {
+  id          String    @id @default(uuid()) @db.Uuid
+  businessId  String?   @db.Uuid
+  type        String    @db.VarChar(60)
+  payload     Json
+  status      JobStatus @default(PENDING)
+  runAt       DateTime  @default(now()) @db.Timestamptz(6)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(8)
+  lockedUntil DateTime? @db.Timestamptz(6)
+  dedupeKey   String?   @unique @db.VarChar(160)
+  lastError   String?   @db.VarChar(500)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+
+  @@index([status, runAt])
+}
+
+// Makes retried POSTs safe. Scoped per business + endpoint scope.
+model IdempotencyKey {
+  id             String           @id @default(uuid()) @db.Uuid
+  businessId     String           @db.Uuid
+  scope          String           @db.VarChar(60) // e.g. "checkout", "payment.initialize"
+  keyHash        String           @db.VarChar(64) // SHA-256 of client Idempotency-Key
+  requestHash    String           @db.VarChar(64) // reject same key with different body
+  state          IdempotencyState @default(IN_PROGRESS)
+  responseStatus Int?
+  responseBody   Json?
+  expiresAt      DateTime         @db.Timestamptz(6)
+  createdAt      DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @db.Timestamptz(6)
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, scope, keyHash])
+  @@index([expiresAt])
+}
+
+// Server-issued proof that the customer explicitly confirmed a consequential action.
+// Bound to a snapshot hash of the cart and totals; single-use; short-lived.
+model ConfirmationRequest {
+  id             String             @id @default(uuid()) @db.Uuid
+  businessId     String             @db.Uuid
+  cartId         String             @db.Uuid
+  customerId     String?            @db.Uuid
+  conversationId String?            @db.Uuid
+  action         ConfirmationAction
+  snapshotHash   String             @db.VarChar(64)
+  tokenHash      String             @unique @db.VarChar(64)
+  expiresAt      DateTime           @db.Timestamptz(6)
+  consumedAt     DateTime?          @db.Timestamptz(6)
+  createdAt      DateTime           @default(now()) @db.Timestamptz(6)
+
+  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  cart         Cart          @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([cartId, expiresAt])
+}
+
+// Append-only. Application DB role should have INSERT/SELECT only on this table.
+model AuditLog {
+  id         String    @id @default(uuid()) @db.Uuid
+  businessId String    @db.Uuid
+  actorType  ActorType
+  actorId    String?   @db.VarChar(64)
+  action     String    @db.VarChar(80) // e.g. ORDER_STATUS_CHANGED, CUSTOMER_PII_REVEALED
+  entityType String    @db.VarChar(40)
+  entityId   String?   @db.VarChar(64)
+  changes    Json? // field-level diffs; sensitive fields redacted
+  ip         String?   @db.VarChar(64)
+  userAgent  String?   @db.VarChar(255)
+  requestId  String?   @db.VarChar(64)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+  @@index([businessId, entityType, entityId])
+}
+
+// Audit of every AI tool call. Inputs are redacted; no raw model transcripts here.
+model AiToolInvocation {
+  id             String       @id @default(uuid()) @db.Uuid
+  businessId     String       @db.Uuid
+  conversationId String       @db.Uuid
+  toolName       String       @db.VarChar(60)
+  status         AiToolStatus
+  inputRedacted  Json
+  resultSummary  Json?
+  errorCode      String?      @db.VarChar(40)
+  latencyMs      Int
+  model          String?      @db.VarChar(60)
+  inputTokens    Int?
+  outputTokens   Int?
+  createdAt      DateTime     @default(now()) @db.Timestamptz(6)
+
+  business     Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([businessId, toolName, createdAt])
+}
