@@ -8,7 +8,25 @@ describe('parseEnv', () => {
       NODE_ENV: 'development',
       APP_BASE_URL: 'http://localhost:3000',
       LOG_LEVEL: 'info',
+      STORE_BUSINESS_SLUG: 'sample-brand',
     });
+  });
+
+  it('defaults the store to the sample brand and leaves the payment provider unset', () => {
+    const env = parseEnv({});
+    expect(env.STORE_BUSINESS_SLUG).toBe('sample-brand');
+    expect(env.PAYMENT_PROVIDER).toBeUndefined();
+  });
+
+  it('refuses the mock payment provider in production', () => {
+    expect(() =>
+      parseEnv({ NODE_ENV: 'production', APP_BASE_URL: 'https://shop.example.com', PAYMENT_PROVIDER: 'MOCK' }),
+    ).toThrow(/PAYMENT_PROVIDER: the mock payment provider is never allowed in production/);
+  });
+
+  it('rejects an unknown payment provider and a malformed store slug', () => {
+    expect(() => parseEnv({ PAYMENT_PROVIDER: 'PAYPAL' })).toThrow(/PAYMENT_PROVIDER/);
+    expect(() => parseEnv({ STORE_BUSINESS_SLUG: 'Not A Slug' })).toThrow(/STORE_BUSINESS_SLUG/);
   });
 
   it('accepts a valid configuration', () => {
