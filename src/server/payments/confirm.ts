@@ -15,7 +15,7 @@ import type { VerifiedTransaction } from './provider';
 
 export type ConfirmOutcome =
   | 'confirmed' // order moved to PAYMENT_CONFIRMED, stock committed
-  | 'already_processed' // payment was no longer INITIALIZED or PENDING
+  | 'already_processed' // payment is SUCCEEDED, or a non-success verdict arrived for a settled payment
   | 'pending' // provider still reports PENDING; the job runner retries later
   | 'failed' // provider reports FAILED or ABANDONED
   | 'reference_mismatch' // provider transaction is for another reference; payment FAILED, flagged
@@ -28,6 +28,7 @@ export type ConfirmOutcome =
   | 'not_found';
 
 const AWAITING = ['INITIALIZED', 'PENDING'] as const;
+const SETTLEABLE = ['INITIALIZED', 'PENDING', 'FAILED', 'ABANDONED'] as const;
 
 // Paid, or past payment in some other way: a further successful payment is an anomaly.
 const ALREADY_PAID: readonly OrderStatus[] = [
@@ -59,14 +60,20 @@ export async function applyVerifiedPayment(
       >`SELECT id, status, \"orderId\", \"amountMinor\", currency FROM \"Payment\"
         WHERE reference = ${reference} AND \"businessId\" = ${scope.businessId}::uuid FOR UPDATE`;
       if (!payment) return 'not_found';
-      if (!(AWAITING as readonly string[]).includes(payment.status)) return 'already_processed';
+      // A SUCCESS can settle a payment we had marked FAILED or ABANDONED. Money the provider confirms is
+      // real: a late success after the reservation expired must still be processed (06 §5). Only a
+      // SUCCEEDED payment is final.
+      if (!(SETTLEABLE as readonly string[]).includes(payment.status)) return 'already_processed';
+      const awaiting = (AWAITING as readonly string[]).includes(payment.status);
 
-      if (verified.status === 'PENDING') return 'pending';
+      if (verified.status === 'PENDING') return awaiting ? 'pending' : 'already_processed';
       if (verified.status === 'FAILED' || verified.status === 'ABANDONED') {
-        await tx.payment.update({
-          where: { id: payment.id },
-          data: { status: verified.status === 'FAILED' ? 'FAILED' : 'ABANDONED', failureReason: `provider_${verified.status.toLowerCase()}` },
-        });
+        if (awaiting) {
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: { status: verified.status === 'FAILED' ? 'FAILED' : 'ABANDONED', failureReason: `provider_${verified.status.toLowerCase()}` },
+          });
+        }
         return 'failed';
       }
 

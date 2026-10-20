@@ -23,7 +23,9 @@ export function paymentVerifyHandler(db: PrismaClient, provider: PaymentProvider
       throw new Error(`payment was made with ${payment.provider}, but the active provider is ${provider.name}`);
     }
 
-    if (payment.status === 'INITIALIZED' || payment.status === 'PENDING') {
+    // A FAILED or ABANDONED payment is still verified: a success can arrive after the customer's failed
+    // attempt, and it must be applied (06 §5). Only a SUCCEEDED payment is final and skipped.
+    if (payment.status !== 'SUCCEEDED') {
       // Verify is the source of truth. A failed call throws, so the job retries and the order is unchanged.
       const verified = await provider.verify(reference);
       const outcome = await applyVerifiedPayment(db, { businessId: payment.businessId }, reference, verified);

@@ -16,7 +16,7 @@ const EnvSchema = z
       .string()
       .regex(/^[a-z0-9-]{1,64}$/, { error: 'must be lowercase letters, digits and hyphens' })
       .default('sample-brand'),
-    // Payment provider adapter. Only the mock exists until Stage 4 adds Paystack.
+    // Payment provider adapter: MOCK for development and CI, PAYSTACK for test and live keys.
     // Unset means: the mock in development and test; in production it must be set to a real provider.
     PAYMENT_PROVIDER: z.enum(['MOCK', 'PAYSTACK']).optional(),
     // Paystack secret key (06 §8). Never sent to the browser, never logged. Test keys (sk_test_) are

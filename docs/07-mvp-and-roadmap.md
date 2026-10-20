@@ -14,12 +14,12 @@ Recorded as of this commit. Update it at the end of every stage.
 | Architecture (Phase 2) | ✅ Written, awaiting approval | `docs/02-architecture.md`, `docs/03`, `docs/05`, `docs/06` |
 | Data model | ✅ Draft, validated with Prisma 7.10.1 | `prisma/schema.prisma` (39 models, 29 enums). **Not migrated.** |
 | UI/UX wireframes (Phase 3) | ✅ Written, awaiting review | `docs/04-ui-ux.md` |
-| Application code | 🟡 Stage 1 scaffold | `src/`: Next.js 16 app with a placeholder storefront and `/api/health`. No commerce features. |
+| Application code | 🟡 Stages 1–4 (core) | `src/`: Next.js 16 app. Catalogue, cart, delivery quote, checkout, order state machine, mock payments, Paystack adapter with signed webhooks, verify jobs and late-payment rules. See the stage sections below for what is not built. |
 | Database migrations | 🟡 Stage 2 | `prisma/migrations/`: generated baseline (39 tables, 29 enums) and hand-written §9 constraints. Applied to a real PostgreSQL 16 in tests. Prisma `migrate deploy` and the drift check run in CI. |
-| Automated tests | 🟡 Stages 1–2 | Spec suite (`npm run test:spec`, 16 tests), unit tests (`npm run test:unit`, 19), database tests (`npm run test:db`, 41: constraints, tenant isolation, seed), end-to-end tests (`npm run test:e2e`, Playwright, run in CI). Business logic is not built yet, so it is not tested. |
-| Storefront, admin dashboard | ⬜ Not started | Stages 5–6 |
+| Automated tests | 🟡 Stages 1–4 | Spec suite (`npm run test:spec`, 16 tests), unit tests (`npm run test:unit`, 106 across all unit-tested modules), database tests (`npm run test:db`, 126 across 9 files: constraints, tenant isolation, seed, cart, checkout, concurrency, payments, expiry, mock-pay HTTP), end-to-end tests (`npm run test:e2e`, Playwright, run in CI). |
+| Storefront, admin dashboard | 🟡 Storefront API only | Catalogue, cart, delivery quote and checkout APIs exist. No storefront pages beyond the placeholder, and no admin (Stages 5–6). |
 | WhatsApp integration | ⬜ Design only | Not connected to Meta. Mock adapter planned (Stage 7). |
-| Payments | ⬜ Design only | Not connected to Paystack. Mock adapter planned (Stage 3). |
+| Payments | 🟡 Stage 4 core | Mock provider (dev, CI, demos only) and a Paystack adapter written and tested with fixtures and a fake provider. **Not run against Paystack's sandbox**: this sandbox cannot reach `api.paystack.co`. Refunds, the customer return-page verify and the reconcile jobs are not built. |
 | AI assistant | ⬜ Design only | No model provider configured. Fallback menu is the first thing built in Stage 7. |
 | Deployment | 🟡 Stage 1 container | `Dockerfile` and `docker-compose.yml` for the web app and PostgreSQL. No hosting yet (Stage 8). |
 
@@ -110,6 +110,8 @@ Each stage ends with a merge to the working branch and passing CI. Sizes are rel
 - Tests: idempotent replay, conflicting replay (422), concurrent duplicate (409), 50 parallel checkouts against 10 units (exactly 10 succeed), price changed mid-checkout (409 with diff).
 - **Exit:** a scripted journey from product list to `PENDING_PAYMENT` and a mock-paid `PAYMENT_CONFIRMED` passes in integration tests.
 
+**Status (Stage 3):** merged in PR #5 (merge commit `cfeadee`, feature commit `c29a432`). Verified against PostgreSQL 16.14: `npm run test:db` 96 of 96 at that commit, including 50 parallel checkouts for 10 units (exactly 10 succeed, no negative stock). Live check on `next dev`: a FAILED attempt then a SUCCESS attempt on the mock page; the order reached `PAYMENT_CONFIRMED`, and repeated presses changed nothing. CI run 39460396726 passed all five jobs. Not built: admin write APIs and the order status endpoint `GET /orders/{orderNumber}` (both wait for Stage 5 auth).
+
 ### Stage 4 — Payments and reconciliation (M)
 
 - `PaymentProvider` interface; Paystack adapter (initialise, verify, refund, webhook parse); mock provider with a signed-webhook simulator.
@@ -118,6 +120,19 @@ Each stage ends with a merge to the working branch and passing CI. Sizes are rel
 - Late-success handling (`06` §5). Refund workflow with two-person threshold.
 - Fixture tests for Paystack signature (valid, invalid, re-serialised body), duplicate and delayed events, amount mismatch.
 - **Exit:** every row in `06` §10 has a passing test. Sandbox run completed if test keys are available; otherwise marked "sandbox not run" in the release notes.
+
+**Status (Stage 4):** core merged in PR #5 (`9db6e5a`, merged as `cfeadee`). Follow-up on `arena/7cd59cb0-application-software`:
+- Late success is applied on FAILED and ABANDONED payments, not refused (06 §5). The verify job checks every payment that is not yet SUCCEEDED, so a success after a failed attempt is never dropped.
+- Reservation expiry (`src/server/payments/expire.ts`) is a sweep run from `runPaymentMaintenance`, not a separate `payment.expire` job type. An expired order gets one final verify where a payment could still succeed. A provider error defers the cancellation; it never cancels. A verified success confirms the order. Otherwise the order is cancelled with reason `payment_timeout`, its stock is released with `RESERVATION_RELEASED` movements, and its awaiting payments are ABANDONED.
+- The mock page sends a signed `charge.success` or `charge.failed` through the real webhook intake, then runs the due jobs. ABANDONED is verified directly, because Paystack sends no abandon event.
+
+Verified locally: `npm run test:db` 126 of 126 on a fresh reset; `npm run check` exit 0 (106 unit tests, lint, types, build). Mutation: removing the provider-error deferral fails the expiry tests; disabling the webhook signature check fails 4 payment tests. Live: the internal runner route returns 404 without the secret and a summary with it; a bad signature returns 400.
+
+**Exit criterion not met yet.** Not every `06` §10 row has a passing test. Still open:
+- Refund workflow, refund execution, refund webhooks and the two-person threshold (3 rows). Deferred to Stage 5, because approval needs staff authentication. The late-success path already flags such money for staff.
+- Customer return-page verify (2 rows). The verify logic is tested at the service level; the page is not built.
+- `payment.reconcile` and `refund.reconcile` jobs; `POST /orders/{id}/payments` to retry a FAILED payment (06 §3).
+- Paystack sandbox run: not done, because the sandbox cannot reach `api.paystack.co`. Needs test keys and a run in an environment with access.
 
 ### Stage 5 — Identity, orders, admin API (L)
 
