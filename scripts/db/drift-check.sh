@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Checks that the committed baseline migration matches prisma/schema.prisma.
-# Runs Prisma's own `migrate diff` (exit 0 = no difference, 2 = difference, 1 = error).
+# Runs Prisma's own `migrate diff --exit-code` (exit 0 = no difference, 2 = difference, 1 = error).
+# Without --exit-code Prisma exits 0 even when the schema and baseline differ, so the flag is required.
 # On failure it also publishes the diff as a GitHub annotation, so the SQL can be read through the
 # API even when job logs are not available.
 set -uo pipefail
@@ -16,7 +17,7 @@ cp prisma/migrations/migration_lock.toml "$tmp/"
 npx prisma migrate diff \
   --from-migrations "$tmp" \
   --to-schema prisma/schema.prisma \
-  --script >"$tmp/drift.sql" 2>"$tmp/drift.err"
+  --script --exit-code >"$tmp/drift.sql" 2>"$tmp/drift.err"
 code=$?
 
 echo "prisma migrate diff exit code: $code"
