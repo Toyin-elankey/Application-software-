@@ -14,7 +14,7 @@ FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_STANDALONE=1
-RUN npm run build
+RUN npm run prisma:generate && npm run build
 
 FROM base AS runtime
 ENV NODE_ENV=production \

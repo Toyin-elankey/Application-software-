@@ -2,14 +2,17 @@
 
 A commerce platform for one brand (multi-brand later) that combines a mobile-first storefront, an AI shopping assistant on the web and WhatsApp, verified payments, order tracking, and a role-based admin dashboard. All channels share one server-side backend and one database.
 
-> **Current status: Stage 1 (foundations).** The repository has a Next.js app with a placeholder storefront and a health check, plus Docker, CI and test setup. It has no commerce features, no database migrations, and no connection to WhatsApp, Paystack or an AI provider. The status of each area is tracked in [`docs/07-mvp-and-roadmap.md`](docs/07-mvp-and-roadmap.md) §1.
+> **Current status: Stage 2 (data layer), built on Stage 1.** The repository has a Next.js app with a placeholder storefront and a health check, a database schema with migrations, seed data and tests against a real PostgreSQL, plus Docker, CI and test setup. It has no commerce features yet, and no connection to WhatsApp, Paystack or an AI provider. The status of each area is tracked in [`docs/07-mvp-and-roadmap.md`](docs/07-mvp-and-roadmap.md) §1.
 
 ## What is here now
 
 | Path | Contents |
 |---|---|
 | [`docs/`](docs/README.md) | Product requirements, architecture, data model, UI/UX wireframes, WhatsApp and AI design, payments design, MVP and roadmap |
-| [`prisma/schema.prisma`](prisma/schema.prisma) | Proposed MVP data model (39 models, 29 enums). Validated with Prisma 7.10.1. Not yet migrated. |
+| [`prisma/schema.prisma`](prisma/schema.prisma) | MVP data model (39 models, 29 enums). Validated with Prisma 7.10.1. |
+| [`prisma/migrations/`](prisma/migrations) | `0001_baseline` (generated from the schema) and `0002_sql_constraints` (hand-written CHECK, unique, partial and full-text objects from docs/03 §9) |
+| [`scripts/db/`](scripts/db) | Migration runner, seed (refuses production), baseline generator, test-database reset |
+| [`tests/db/`](tests/db) | Database tests: constraints, tenant isolation, seed |
 | [`prisma.config.ts`](prisma.config.ts) | Prisma 7 configuration; the database URL is read from `DATABASE_URL` |
 | [`src/`](src) | Next.js app: placeholder storefront, `/api/health`, validated configuration (`src/lib/env.ts`), structured logger |
 | [`e2e/`](e2e), [`tests/spec/`](tests/spec) | End-to-end tests (Playwright) and specification tests (node:test) |
@@ -39,8 +42,8 @@ Two constraints from Meta's current WhatsApp terms shape the design: the assista
 ## Roadmap at a glance
 
 0. Specification ✅
-1. Foundations: scaffold, Docker, CI (current)
-2. Data layer: migrations, seed, constraint tests
+1. Foundations: scaffold, Docker, CI ✅
+2. Data layer: migrations, seed, constraint tests (current)
 3. Commerce core: catalogue, cart, pricing, checkout with idempotency
 4. Payments: Paystack adapter, webhooks, verification, refunds
 5. Identity, orders, admin API, RBAC, audit
@@ -81,9 +84,26 @@ docker compose up --build
 # web: http://localhost:3000  database: 127.0.0.1:5432 (user app_user, database commerce_dev)
 ```
 
-Configuration is validated at boot in `src/lib/env.ts`. A missing or invalid variable stops the server with a message that names the variable and never prints its value. Variables read today: `NODE_ENV`, `APP_BASE_URL`, `LOG_LEVEL`. `DATABASE_URL` is accepted but not used until Stage 2.
+Configuration is validated at boot in `src/lib/env.ts`. A missing or invalid variable stops the server with a message that names the variable and never prints its value. Variables read today: `NODE_ENV`, `APP_BASE_URL`, `LOG_LEVEL`, and `DATABASE_URL` (used by the database scripts and the repository layer).
 
-Not set up yet: database migrations and seed data (Stage 2), the worker process (Stage 4), authentication (Stage 5), and any WhatsApp, payment or AI provider configuration (Stages 4 and 7).
+Database (PostgreSQL 16; `docker compose up db` provides one on 127.0.0.1:5432):
+
+```bash
+export DATABASE_URL=postgresql://app_user:change-me-local-only@localhost:5432/commerce_dev
+npm run db:migrate     # apply migrations (safe to re-run)
+npm run db:seed        # sample business; refuses NODE_ENV=production
+```
+
+Database tests use a separate, disposable database. Its name must contain `test`, because the reset script refuses any other name and drops the public schema:
+
+```bash
+docker compose exec db psql -U app_user -d commerce_dev -c "CREATE DATABASE commerce_test"
+DATABASE_URL=postgresql://app_user:change-me-local-only@localhost:5432/commerce_test npm run test:db
+```
+
+Migrations are plain SQL under `prisma/migrations`. `npm run db:baseline` regenerates `0001_baseline` from the schema, and `npm run db:baseline:check` fails if the committed copy is stale. Prisma's own `migrate diff` drift check runs in CI only, because it needs Prisma's schema engine.
+
+Not set up yet: the worker process (Stage 4), authentication (Stage 5), and any WhatsApp, payment or AI provider configuration (Stages 4 and 7).
 
 ## Documentation
 
