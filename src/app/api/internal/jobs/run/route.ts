@@ -2,7 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { getEnv } from '@/lib/env';
 import { getDb } from '@/server/db/client';
 import { AppError, handle, jsonResponse } from '@/server/http/problem';
-import { drainPaymentJobs } from '@/server/payments/drain';
+import { runPaymentMaintenance } from '@/server/payments/drain';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +12,7 @@ function bearerMatches(header: string | null, secret: string): boolean {
   return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
-// POST /api/internal/jobs/run. Runs due payment jobs (retries with backoff). Called by a scheduler
+// POST /api/internal/jobs/run. Runs reservation expiry, then due payment jobs (retries with backoff). Called by a scheduler
 // with Authorization: Bearer <JOB_RUNNER_SECRET>. Without the secret configured the route does not exist.
 export function POST(request: Request) {
   return handle(async () => {
@@ -20,7 +20,7 @@ export function POST(request: Request) {
     if (!secret || !bearerMatches(request.headers.get('authorization'), secret)) {
       throw new AppError(404, 'not_found', 'Not found.');
     }
-    const summary = await drainPaymentJobs(getDb(), { limit: 25 });
+    const summary = await runPaymentMaintenance(getDb(), { limit: 25 });
     return jsonResponse({ summary });
   });
 }

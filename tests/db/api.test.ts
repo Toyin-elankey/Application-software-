@@ -228,17 +228,18 @@ describe('mock payment page over HTTP', () => {
     expect((await db.payment.findUniqueOrThrow({ where: { reference } })).status).toBe('FAILED');
   });
 
-  // Known gap until Stage 4: docs/06 §3 allows FAILED -> PENDING (a new authorisation on the same
-  // order) through POST /orders/{id}/payments, which is not built yet. Until then a failed payment is
-  // final, and this test records that the order stays awaiting payment with no way to pay it.
-  it('after a failed attempt, a later success does not pay the order (retry arrives in Stage 4)', async () => {
+  // docs/06 §5: a verified SUCCESS settles a payment that was marked FAILED. The customer who retried
+  // after a failed card attempt is paid, not refused. (Retrying through a new authorisation,
+  // POST /orders/{id}/payments, is still deferred; the mock page is the only way to re-attempt here.)
+  it('after a failed attempt, a later verified success pays the order', async () => {
     const { orderId, reference } = await placeOrderOverHttp();
     const [failReq, failCtx] = pageRequest(reference, 'FAILED');
     await postMockPay(failReq, failCtx);
     const [okReq, okCtx] = pageRequest(reference, 'SUCCESS');
     const response = await postMockPay(okReq, okCtx);
-    expect(await response.text()).toMatch(/already FAILED\. Nothing changed/);
-    expect((await db.order.findUniqueOrThrow({ where: { id: orderId } })).status).toBe('PENDING_PAYMENT');
+    expect(await response.text()).toMatch(/Payment verified/);
+    expect((await db.order.findUniqueOrThrow({ where: { id: orderId } })).status).toBe('PAYMENT_CONFIRMED');
+    expect((await db.payment.findUniqueOrThrow({ where: { reference } })).status).toBe('SUCCEEDED');
   });
 
   it('a successful payment is verified and marks the order paid, once', async () => {
