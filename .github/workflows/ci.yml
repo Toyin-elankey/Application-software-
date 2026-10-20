@@ -72,11 +72,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://ci:ci-throwaway@localhost:5432/commerce_deploy_check
       - name: Baseline migration matches the Prisma schema (no drift)
-        run: |
-          rm -rf /tmp/baseline-only && mkdir -p /tmp/baseline-only/0001_baseline
-          cp prisma/migrations/0001_baseline/migration.sql /tmp/baseline-only/0001_baseline/
-          cp prisma/migrations/migration_lock.toml /tmp/baseline-only/
-          npx prisma migrate diff --from-migrations /tmp/baseline-only --to-schema prisma/schema.prisma --exit-code
+        run: bash scripts/db/drift-check.sh
 
   e2e:
     name: End-to-end tests (Playwright)
