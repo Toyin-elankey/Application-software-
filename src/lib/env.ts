@@ -18,7 +18,13 @@ const EnvSchema = z
       .default('sample-brand'),
     // Payment provider adapter. Only the mock exists until Stage 4 adds Paystack.
     // Unset means: the mock in development and test; in production it must be set to a real provider.
-    PAYMENT_PROVIDER: z.enum(['MOCK']).optional(),
+    PAYMENT_PROVIDER: z.enum(['MOCK', 'PAYSTACK']).optional(),
+    // Paystack secret key (06 §8). Never sent to the browser, never logged. Test keys (sk_test_) are
+    // refused in production; live keys (sk_live_) are refused everywhere else.
+    PAYSTACK_SECRET_KEY: z.string().min(1, { error: 'must not be empty when set' }).optional(),
+    // Bearer token for POST /api/internal/jobs/run, which a scheduler calls to retry payment jobs.
+    // Unset means the endpoint does not exist.
+    JOB_RUNNER_SECRET: z.string().min(32, { error: 'must be at least 32 characters when set' }).optional(),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && !isSecureOrLocal(env.APP_BASE_URL)) {
@@ -34,6 +40,22 @@ const EnvSchema = z
         path: ['PAYMENT_PROVIDER'],
         message: 'the mock payment provider is never allowed in production',
       });
+    }
+    if (env.PAYMENT_PROVIDER === 'PAYSTACK' && !env.PAYSTACK_SECRET_KEY) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['PAYSTACK_SECRET_KEY'],
+        message: 'is required when PAYMENT_PROVIDER is PAYSTACK',
+      });
+    }
+    if (env.PAYSTACK_SECRET_KEY) {
+      const key = env.PAYSTACK_SECRET_KEY;
+      if (env.NODE_ENV === 'production' && !key.startsWith('sk_live_')) {
+        ctx.addIssue({ code: 'custom', path: ['PAYSTACK_SECRET_KEY'], message: 'must be a live key (sk_live_) in production' });
+      }
+      if (env.NODE_ENV !== 'production' && !key.startsWith('sk_test_')) {
+        ctx.addIssue({ code: 'custom', path: ['PAYSTACK_SECRET_KEY'], message: 'must be a test key (sk_test_) outside production' });
+      }
     }
   });
 

@@ -19,6 +19,7 @@ const ALLOWED: Record<string, Actor[]> = {
   'PROCESSING>CANCELLED': ['STAFF'],
   'READY_FOR_DISPATCH>CANCELLED': ['STAFF'],
   'REFUND_PENDING>REFUNDED': ['SYSTEM'],
+  'CANCELLED>PAYMENT_CONFIRMED': ['SYSTEM'],
 };
 
 describe('order state machine', () => {

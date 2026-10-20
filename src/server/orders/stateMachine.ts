@@ -43,6 +43,9 @@ export const TRANSITIONS: readonly Rule[] = [
   { from: 'PROCESSING', to: 'CANCELLED', actors: ['STAFF'] },
   { from: 'READY_FOR_DISPATCH', to: 'CANCELLED', actors: ['STAFF'] },
   { from: 'REFUND_PENDING', to: 'REFUNDED', actors: ['SYSTEM'] },
+  // Late payment reinstatement (06 §5): a payment verified after the reservation expired, with stock
+  // still available, moves the order back to paid. Only the payment confirmation path uses this.
+  { from: 'CANCELLED', to: 'PAYMENT_CONFIRMED', actors: ['SYSTEM'] },
 ];
 
 export type TransitionContext = {

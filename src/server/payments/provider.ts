@@ -1,9 +1,9 @@
 import { getEnv } from '@/lib/env';
 
 // Payment provider contract (06 §2). Domain code uses only this interface. Provider payload shapes
-// are mapped inside each adapter. Stage 3 has only the mock; Paystack arrives in Stage 4.
+// are mapped inside each adapter. Stage 4 adds the Paystack adapter; FLUTTERWAVE is post-MVP.
 
-export type ProviderName = 'MOCK';
+export type ProviderName = 'MOCK' | 'PAYSTACK';
 
 export type InitializeInput = {
   reference: string;

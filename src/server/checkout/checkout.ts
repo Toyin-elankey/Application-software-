@@ -105,6 +105,7 @@ export async function placeOrder(
     placed = await db.$transaction(
       (tx) =>
         placeInTransaction(tx, store, {
+          providerName: args.provider.name,
           cartId: cart.id,
           keyId: claim.keyId,
           keyHash,
@@ -140,6 +141,7 @@ async function placeInTransaction(
   tx: Prisma.TransactionClient,
   store: StoreContext,
   args: {
+    providerName: 'MOCK' | 'PAYSTACK';
     cartId: string;
     keyId: string;
     keyHash: string;
@@ -323,7 +325,7 @@ async function placeInTransaction(
         create: {
           id: paymentId,
           businessId: scope.businessId,
-          provider: 'MOCK',
+          provider: args.providerName,
           reference,
           status: 'INITIALIZED',
           amountMinor: totals.totalMinor,
