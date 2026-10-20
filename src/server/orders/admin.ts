@@ -167,11 +167,18 @@ export async function transitionOrderForStaff(
       const from = current.status as OrderStatus;
       const key = `${from}>${input.to}`;
       let permission: Permission;
-      // Cancelling is only for unpaid orders. A paid order needs a refund, which is not built yet.
+      // Cancelling is only for unpaid orders. A paid order is refunded, not cancelled (PRD §7).
       if (input.to === 'CANCELLED' && from === 'PENDING_PAYMENT') permission = 'orders.cancel_unpaid';
       else if (FULFILMENT_MOVES.has(key)) permission = 'orders.fulfil';
+      // A paid order is refunded, not cancelled (PRD §7). A paid cancellation needs refunds.request; a return
+      // from DELIVERED needs refunds.approve (PRD §7: Finance or Owner).
+      else if (input.to === 'REFUND_PENDING' && (from === 'PAYMENT_CONFIRMED' || from === 'CONFIRMED')) permission = 'refunds.request';
+      else if (input.to === 'REFUND_PENDING' && from === 'DELIVERED') permission = 'refunds.approve';
       else throw new AppError(422, 'transition_not_available', `Staff cannot move an order from ${from} to ${input.to} here.`);
       if (!hasPermission(actor.role, permission)) throw new AppError(403, 'forbidden', 'Your role does not allow this action.');
+      if (input.to === 'REFUND_PENDING' && !input.reason?.trim()) {
+        throw new AppError(422, 'reason_required', 'Give a reason for the refund.');
+      }
 
       if (input.to === 'CANCELLED') {
         const outcome = await cancelUnpaidOrderTx(tx, scope, input.orderId, {

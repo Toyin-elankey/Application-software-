@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger';
 import { runDueJobs, type RunSummary } from '@/server/jobs/runner';
 import { expireDueReservations, type ExpirySummary } from './expire';
 import { reconcileStalePayments, type ReconcileSummary } from './reconcile';
+import { refundReconcileHandler, sweepStaleRefunds } from '@/server/refunds/service';
 import { getPaymentProvider } from './resolve';
 import { paymentVerifyHandler } from './verifyJob';
 
@@ -19,14 +20,19 @@ export async function drainPaymentJobs(db: PrismaClient, options: { limit?: numb
     return null;
   }
   try {
-    return await runDueJobs(db, { 'payment.verify': paymentVerifyHandler(db, provider) }, options);
+    return await runDueJobs(db, { 'payment.verify': paymentVerifyHandler(db, provider), 'refund.reconcile': refundReconcileHandler(db, provider) }, options);
   } catch (error) {
     logger.error({ msg: 'payment job runner failed', error: error instanceof Error ? error.message : 'unknown' });
     return null;
   }
 }
 
-export type MaintenanceSummary = { jobs: RunSummary | null; expiry: ExpirySummary | null; reconcile: ReconcileSummary | null };
+export type MaintenanceSummary = {
+  jobs: RunSummary | null;
+  expiry: ExpirySummary | null;
+  reconcile: ReconcileSummary | null;
+  refunds: { checked: number; updated: number; deferred: number } | null;
+};
 
 /** Expiry sweep, then the due jobs. Each part is independent: one failing does not stop the other. */
 export async function runPaymentMaintenance(db: PrismaClient, options: { now?: Date; limit?: number } = {}): Promise<MaintenanceSummary> {
@@ -53,6 +59,15 @@ export async function runPaymentMaintenance(db: PrismaClient, options: { now?: D
     }
   }
 
+  let refunds: MaintenanceSummary['refunds'] = null;
+  if (provider) {
+    try {
+      refunds = await sweepStaleRefunds(db, provider, { now: options.now, limit: options.limit });
+    } catch (error) {
+      logger.error({ msg: 'refund sweep failed', error: error instanceof Error ? error.message : 'unknown' });
+    }
+  }
+
   const jobs = await drainPaymentJobs(db, { limit: options.limit, now: options.now });
-  return { jobs, expiry, reconcile };
+  return { jobs, expiry, reconcile, refunds };
 }

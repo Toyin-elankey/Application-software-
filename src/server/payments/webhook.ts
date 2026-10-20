@@ -52,7 +52,11 @@ export async function receivePaystackWebhook(
     RELEVANT_EVENTS.has(event.event) && event.reference
       ? await db.payment.findUnique({ where: { reference: event.reference }, select: { id: true, businessId: true } })
       : null;
-  const shouldVerify = payment !== null;
+  // Refund events are not trusted either: the job asks the provider for the refund's state. The job is
+  // created even if the refund is not recorded yet (the execute response may still be on its way); the
+  // job then retries.
+  const refundEvent = event.event.startsWith('refund.') && event.providerId ? event.providerId : null;
+  const shouldVerify = payment !== null || refundEvent !== null;
 
   try {
     await db.$transaction(async (tx) => {
@@ -70,13 +74,22 @@ export async function receivePaystackWebhook(
           status: shouldVerify ? 'RECEIVED' : 'IGNORED',
         },
       });
-      if (shouldVerify && payment) {
+      if (payment) {
         await tx.job.create({
           data: {
             businessId: payment.businessId,
             type: 'payment.verify',
             payload: { reference: event.reference, webhookEventId: webhook.id },
             dedupeKey: `payment.verify:${webhook.id}`,
+          },
+        });
+      } else if (refundEvent) {
+        await tx.job.create({
+          data: {
+            businessId: null,
+            type: 'refund.reconcile',
+            payload: { providerRefundId: refundEvent, webhookEventId: webhook.id },
+            dedupeKey: `refund.reconcile:${webhook.id}`,
           },
         });
       }

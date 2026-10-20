@@ -453,6 +453,7 @@ CREATE TABLE "Refund" (
     "reason" VARCHAR(255) NOT NULL,
     "status" "RefundStatus" NOT NULL DEFAULT 'PENDING',
     "providerRefundId" VARCHAR(100),
+    "failureReason" VARCHAR(255),
     "requestedByStaffId" UUID,
     "approvedByStaffId" UUID,
     "processedAt" TIMESTAMPTZ(6),

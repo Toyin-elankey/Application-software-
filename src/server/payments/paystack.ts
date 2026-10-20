@@ -1,6 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { getEnv } from '@/lib/env';
-import type { InitializeInput, PaymentProvider, VerifiedTransaction } from './provider';
+import type { InitializeInput, PaymentProvider, RefundOutcome, VerifiedTransaction } from './provider';
 
 // Paystack adapter (06 §2, §4). Amounts are kobo, passed as integers. Field names follow Paystack's
 // public API reference at the time of writing; each one is checked when the response is read, and
@@ -81,12 +81,18 @@ const VERIFY_STATUS: Record<string, VerifiedTransaction['status']> = {
   abandoned: 'ABANDONED',
 };
 
-const REFUND_STATUS: Record<string, 'PENDING' | 'PROCESSING' | 'SUCCEEDED' | 'FAILED'> = {
+// Paystack refund statuses (refund API reference). Anything else, including "needs-attention", is not
+// final, so it maps to PROCESSING: the refund stays open for staff and is checked again later.
+const REFUND_STATUS: Record<string, RefundOutcome> = {
   pending: 'PENDING',
   processing: 'PROCESSING',
   processed: 'SUCCEEDED',
   failed: 'FAILED',
 };
+
+function mapRefundStatus(value: unknown): RefundOutcome {
+  return (typeof value === 'string' && REFUND_STATUS[value]) || 'PROCESSING';
+}
 
 export class PaystackProvider implements PaymentProvider {
   readonly name = 'PAYSTACK' as const;
@@ -142,7 +148,9 @@ export class PaystackProvider implements PaymentProvider {
   async refund(input: {
     providerTransactionId: string;
     amountMinor: bigint;
-  }): Promise<{ providerRefundId: string; status: 'PENDING' | 'PROCESSING' | 'SUCCEEDED' | 'FAILED' }> {
+    /** Our refund id. Paystack's refund endpoint has no reference field, so it is not sent. */
+    reference?: string;
+  }): Promise<{ providerRefundId: string; status: RefundOutcome }> {
     const amount = Number(input.amountMinor);
     if (!Number.isSafeInteger(amount) || amount <= 0) throw new PaystackError('invalid refund amount', null, false);
     const data = (await this.call('POST', '/refund', { transaction: input.providerTransactionId, amount })) as {
@@ -152,7 +160,16 @@ export class PaystackProvider implements PaymentProvider {
     if ((typeof data.id !== 'number' && typeof data.id !== 'string') || typeof data.status !== 'string') {
       throw new PaystackError('refund response had an unexpected shape', 200, true);
     }
-    return { providerRefundId: String(data.id), status: REFUND_STATUS[data.status] ?? 'PENDING' };
+    return { providerRefundId: String(data.id), status: mapRefundStatus(data.status) };
+  }
+
+  /** Current state of one refund (GET /refund/:id). */
+  async getRefund(providerRefundId: string): Promise<{ providerRefundId: string; status: RefundOutcome }> {
+    const data = (await this.call('GET', `/refund/${encodeURIComponent(providerRefundId)}`)) as { id?: unknown; status?: unknown };
+    if ((typeof data.id !== 'number' && typeof data.id !== 'string') || String(data.id) !== providerRefundId || typeof data.status !== 'string') {
+      throw new PaystackError('refund lookup had an unexpected shape', 200, true);
+    }
+    return { providerRefundId, status: mapRefundStatus(data.status) };
   }
 
   private async call(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown> {
