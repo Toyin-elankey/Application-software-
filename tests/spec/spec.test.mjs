@@ -248,15 +248,27 @@ test('env: .env is ignored by git and .env.example is not', () => {
 // 6. Status honesty
 // ---------------------------------------------------------------------------
 
-test('status: roadmap says application code is not started while src/ is absent', () => {
-  // When Stage 1 lands, update docs/07 §1 and this test together.
-  if (existsSync(join(root, 'src'))) return;
-  const row = read('docs/07-mvp-and-roadmap.md').match(/\| Application code \| (.*?) \|/);
+test('status: roadmap and README state the true code status for this checkout', () => {
+  const roadmap = read('docs/07-mvp-and-roadmap.md');
+  const readme = read('README.md');
+  const row = roadmap.match(/\| Application code \| (.*?) \|/);
   assert.ok(row, 'Application code row missing from docs/07 §1');
-  assert.match(row[1], /Not started/);
+  if (existsSync(join(root, 'src'))) {
+    // Stage 1 scaffold exists: the docs must say so and must not claim it is absent.
+    assert.match(row[1], /Stage 1/);
+    assert.doesNotMatch(row[1], /Not started/);
+    assert.match(readme, /Stage 1/);
+    assert.doesNotMatch(readme, /no runnable application yet/i);
+  } else {
+    assert.match(row[1], /Not started/);
+    assert.match(readme, /no runnable application yet/i);
+  }
 });
 
-test('status: README does not claim a runnable application', () => {
-  if (existsSync(join(root, 'src'))) return;
-  assert.match(read('README.md'), /no runnable application yet/i);
+test('status: every npm script the README tells the reader to run exists in package.json', () => {
+  const pkg = JSON.parse(read('package.json'));
+  const mentioned = [...read('README.md').matchAll(/npm (?:run )?([a-z0-9:]+)/g)].map((m) => m[1]);
+  const known = new Set(['install', 'ci', 'test', ...Object.keys(pkg.scripts)]);
+  const missing = [...new Set(mentioned)].filter((name) => !known.has(name));
+  assert.deepEqual(missing, [], 'README mentions npm commands that package.json does not define');
 });

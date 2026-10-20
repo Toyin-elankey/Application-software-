@@ -14,16 +14,16 @@ Recorded as of this commit. Update it at the end of every stage.
 | Architecture (Phase 2) | ✅ Written, awaiting approval | `docs/02-architecture.md`, `docs/03`, `docs/05`, `docs/06` |
 | Data model | ✅ Draft, validated with Prisma 7.10.1 | `prisma/schema.prisma` (39 models, 29 enums). **Not migrated.** |
 | UI/UX wireframes (Phase 3) | ✅ Written, awaiting review | `docs/04-ui-ux.md` |
-| Application code | ⬜ Not started | No `src/` yet |
+| Application code | 🟡 Stage 1 scaffold | `src/`: Next.js 16 app with a placeholder storefront and `/api/health`. No commerce features. |
 | Database migrations | ⬜ Not started | Stage 2 |
-| Automated tests | ⬜ Not started | No test suite yet. Nothing in this repository is tested. |
+| Automated tests | 🟡 Stage 1 | Spec suite (`npm run test:spec`, 16 tests), unit tests (`npm run test:unit`, Vitest), end-to-end tests (`npm run test:e2e`, Playwright, run in CI). Business logic is not built yet, so it is not tested. |
 | Storefront, admin dashboard | ⬜ Not started | Stages 5–6 |
 | WhatsApp integration | ⬜ Design only | Not connected to Meta. Mock adapter planned (Stage 7). |
 | Payments | ⬜ Design only | Not connected to Paystack. Mock adapter planned (Stage 3). |
 | AI assistant | ⬜ Design only | No model provider configured. Fallback menu is the first thing built in Stage 7. |
-| Deployment | ⬜ Not started | Stage 8 |
+| Deployment | 🟡 Stage 1 container | `Dockerfile` and `docker-compose.yml` for the web app and PostgreSQL. No hosting yet (Stage 8). |
 
-**What this means.** Nothing is claimed as working. The specification is complete enough to build from, and the data model has passed schema validation. The next step is the scaffold in Stage 1.
+**What this means.** Stage 1 adds a runnable placeholder app, but it has no business features. The specification is complete enough to build from, and the data model has passed schema validation. Next is Stage 2, the data layer. The rows marked 🟡 are verified only as far as the commands listed in the evidence column have been run; see the Stage 1 section for what CI has and has not confirmed.
 
 ---
 

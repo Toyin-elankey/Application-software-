@@ -2,97 +2,97 @@ TAP version 13
 # Subtest: schema: passes prisma validate
 ok 1 - schema: passes prisma validate
   ---
-  duration_ms: 965.785137
+  duration_ms: 849.526218
   type: 'test'
   ...
 # Subtest: schema: is formatted (prisma format --check)
 ok 2 - schema: is formatted (prisma format --check)
   ---
-  duration_ms: 919.952448
+  duration_ms: 866.867576
   type: 'test'
   ...
 # Subtest: schema: model and enum counts match the README
 ok 3 - schema: model and enum counts match the README
   ---
-  duration_ms: 0.389765
+  duration_ms: 0.366824
   type: 'test'
   ...
 # Subtest: schema: every model has a primary key
 ok 4 - schema: every model has a primary key
   ---
-  duration_ms: 0.895525
+  duration_ms: 0.805616
   type: 'test'
   ...
 # Subtest: schema: every tenant-owned model relates to Business
 ok 5 - schema: every tenant-owned model relates to Business
   ---
-  duration_ms: 0.400868
+  duration_ms: 0.477109
   type: 'test'
   ...
 # Subtest: schema: money fields are BigInt, never Float or Decimal
 ok 6 - schema: money fields are BigInt, never Float or Decimal
   ---
-  duration_ms: 0.446661
+  duration_ms: 0.499225
   type: 'test'
   ...
 # Subtest: schema: idempotency and duplicate-protection keys exist (docs/03 §5)
 ok 7 - schema: idempotency and duplicate-protection keys exist (docs/03 §5)
   ---
-  duration_ms: 0.34401
+  duration_ms: 1.457368
   type: 'test'
   ...
 # Subtest: schema: order lifecycle enum has all eleven states from the PRD §7
 ok 8 - schema: order lifecycle enum has all eleven states from the PRD §7
   ---
-  duration_ms: 0.406089
+  duration_ms: 0.358754
   type: 'test'
   ...
 # Subtest: docs: every relative markdown link resolves
 ok 9 - docs: every relative markdown link resolves
   ---
-  duration_ms: 2.606932
+  duration_ms: 1.904864
   type: 'test'
   ...
 # Subtest: docs: explicit cross-document section references resolve
 ok 10 - docs: explicit cross-document section references resolve
   ---
-  duration_ms: 5.982342
+  duration_ms: 5.042951
   type: 'test'
   ...
 # Subtest: PRD: requirement ids are unique
 ok 11 - PRD: requirement ids are unique
   ---
-  duration_ms: 0.549347
+  duration_ms: 0.510438
   type: 'test'
   ...
 # Subtest: PRD: every requirement row has a priority of M, S or C
 ok 12 - PRD: every requirement row has a priority of M, S or C
   ---
-  duration_ms: 0.439196
+  duration_ms: 0.439776
   type: 'test'
   ...
 # Subtest: env: .env.example contains no real-looking secrets
 ok 13 - env: .env.example contains no real-looking secrets
   ---
-  duration_ms: 0.555304
+  duration_ms: 0.528517
   type: 'test'
   ...
 # Subtest: env: .env is ignored by git and .env.example is not
 ok 14 - env: .env is ignored by git and .env.example is not
   ---
-  duration_ms: 0.143637
+  duration_ms: 0.153945
   type: 'test'
   ...
-# Subtest: status: roadmap says application code is not started while src/ is absent
-ok 15 - status: roadmap says application code is not started while src/ is absent
+# Subtest: status: roadmap and README state the true code status for this checkout
+ok 15 - status: roadmap and README state the true code status for this checkout
   ---
-  duration_ms: 0.157558
+  duration_ms: 0.229883
   type: 'test'
   ...
-# Subtest: status: README does not claim a runnable application
-ok 16 - status: README does not claim a runnable application
+# Subtest: status: every npm script the README tells the reader to run exists in package.json
+ok 16 - status: every npm script the README tells the reader to run exists in package.json
   ---
-  duration_ms: 0.0996
+  duration_ms: 0.3922
   type: 'test'
   ...
 1..16
@@ -103,4 +103,4 @@ ok 16 - status: README does not claim a runnable application
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 1964.336813
+# duration_ms 1791.944627

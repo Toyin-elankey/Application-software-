@@ -16,3 +16,10 @@ coverage/
 # Python tooling
 __pycache__/
 .venv*/
+
+# Next.js, test and tooling output
+next-env.d.ts
+*.tsbuildinfo
+playwright-report/
+test-results/
+blob-report/

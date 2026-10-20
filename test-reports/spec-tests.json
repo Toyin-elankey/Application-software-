@@ -1,7 +1,7 @@
 {
   "run": {
-    "branch": "arena/cafce384-application-software",
-    "commit": "36b027f",
+    "branch": "arena/ca7870ef-application-software",
+    "commit": "cf1ed1c",
     "node": "v22.22.3",
     "prisma": "7.10.1",
     "date": "2026-10-20"
@@ -10,84 +10,84 @@
     "total": 16,
     "passed": 16,
     "failed": 0,
-    "duration_ms": 1899.17
+    "duration_ms": 1729.57
   },
   "tests": [
     {
       "name": "schema: passes prisma validate",
       "category": "schema",
       "status": "pass",
-      "duration_ms": 965.79,
+      "duration_ms": 849.53,
       "error": null
     },
     {
       "name": "schema: is formatted (prisma format --check)",
       "category": "schema",
       "status": "pass",
-      "duration_ms": 919.95,
+      "duration_ms": 866.87,
       "error": null
     },
     {
       "name": "schema: model and enum counts match the README",
       "category": "schema",
       "status": "pass",
-      "duration_ms": 0.39,
+      "duration_ms": 0.37,
       "error": null
     },
     {
       "name": "schema: every model has a primary key",
       "category": "schema",
       "status": "pass",
-      "duration_ms": 0.9,
+      "duration_ms": 0.81,
       "error": null
     },
     {
       "name": "schema: every tenant-owned model relates to Business",
       "category": "schema",
       "status": "pass",
-      "duration_ms": 0.4,
+      "duration_ms": 0.48,
       "error": null
     },
     {
       "name": "schema: money fields are BigInt, never Float or Decimal",
       "category": "schema",
       "status": "pass",
-      "duration_ms": 0.45,
+      "duration_ms": 0.5,
       "error": null
     },
     {
       "name": "schema: idempotency and duplicate-protection keys exist (docs/03 \u00a75)",
       "category": "schema",
       "status": "pass",
-      "duration_ms": 0.34,
+      "duration_ms": 1.46,
       "error": null
     },
     {
       "name": "schema: order lifecycle enum has all eleven states from the PRD \u00a77",
       "category": "schema",
       "status": "pass",
-      "duration_ms": 0.41,
+      "duration_ms": 0.36,
       "error": null
     },
     {
       "name": "docs: every relative markdown link resolves",
       "category": "docs",
       "status": "pass",
-      "duration_ms": 2.61,
+      "duration_ms": 1.9,
       "error": null
     },
     {
       "name": "docs: explicit cross-document section references resolve",
       "category": "docs",
       "status": "pass",
-      "duration_ms": 5.98,
+      "duration_ms": 5.04,
       "error": null
     },
     {
       "name": "PRD: requirement ids are unique",
       "category": "PRD",
       "status": "pass",
-      "duration_ms": 0.55,
+      "duration_ms": 0.51,
       "error": null
     },
     {
@@ -101,28 +101,28 @@
       "name": "env: .env.example contains no real-looking secrets",
       "category": "env",
       "status": "pass",
-      "duration_ms": 0.56,
+      "duration_ms": 0.53,
       "error": null
     },
     {
       "name": "env: .env is ignored by git and .env.example is not",
       "category": "env",
       "status": "pass",
-      "duration_ms": 0.14,
+      "duration_ms": 0.15,
       "error": null
     },
     {
-      "name": "status: roadmap says application code is not started while src/ is absent",
+      "name": "status: roadmap and README state the true code status for this checkout",
       "category": "status",
       "status": "pass",
-      "duration_ms": 0.16,
+      "duration_ms": 0.23,
       "error": null
     },
     {
-      "name": "status: README does not claim a runnable application",
+      "name": "status: every npm script the README tells the reader to run exists in package.json",
       "category": "status",
       "status": "pass",
-      "duration_ms": 0.1,
+      "duration_ms": 0.39,
       "error": null
     }
   ]
