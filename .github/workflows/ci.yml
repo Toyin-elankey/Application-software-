@@ -23,11 +23,56 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run prisma:generate
+      - run: npm run db:baseline:check
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test
       - run: npm run prisma:validate
       - run: npm run build
+
+  database:
+    name: Migrations, seed and database tests (PostgreSQL 16)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci-throwaway
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: ci-throwaway
+      DATABASE_URL: postgresql://ci:ci-throwaway@localhost:5432/commerce_test
+      SHADOW_DATABASE_URL: postgresql://ci:ci-throwaway@localhost:5432/commerce_shadow
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run prisma:generate
+      - name: Create throwaway databases
+        run: |
+          psql -h localhost -U ci -d postgres -c "CREATE DATABASE commerce_test" \
+            -c "CREATE DATABASE commerce_shadow" -c "CREATE DATABASE commerce_deploy_check"
+      - name: Migrate and seed the test database, then run database tests
+        run: npm run test:db
+      - name: Prisma Migrate accepts the migrations (migrate deploy)
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://ci:ci-throwaway@localhost:5432/commerce_deploy_check
+      - name: Baseline migration matches the Prisma schema (no drift)
+        run: bash scripts/db/drift-check.sh
 
   e2e:
     name: End-to-end tests (Playwright)
@@ -41,6 +86,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run prisma:generate
       - run: npx playwright install --with-deps chromium
       - run: npm run build
       - run: npm run test:e2e
