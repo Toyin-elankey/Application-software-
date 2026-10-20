@@ -225,7 +225,7 @@ Single customer-visible status with transitions enforced on the server. "Actor" 
 | — | `PENDING_PAYMENT` | Customer (checkout) | Stock reserved; reservation expiry set; payment record created. |
 | `PENDING_PAYMENT` | `PAYMENT_CONFIRMED` | System (verified payment) | Provider verification passed; stock committed; `paidAt` set; payment-received notification queued. |
 | `PENDING_PAYMENT` | `CANCELLED` | System (expiry) or customer | Reservation released; no refund needed. |
-| `PAYMENT_CONFIRMED` | `CONFIRMED` | Staff or system (auto after verification, D-05) | Order confirmed notification queued. |
+| `PAYMENT_CONFIRMED` | `CONFIRMED` | Staff (manual confirmation, D-05) | Order confirmed notification queued when staff confirm. |
 | `PAYMENT_CONFIRMED` / `CONFIRMED` | `REFUND_PENDING` | Staff | Cancelled after payment. Refund requested. |
 | `CONFIRMED` | `PROCESSING` | Staff (fulfilment) | — |
 | `PROCESSING` | `READY_FOR_DISPATCH` | Staff (fulfilment) | Packed and labelled. |
