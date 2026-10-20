@@ -129,7 +129,7 @@ Each stage ends with a merge to the working branch and passing CI. Sizes are rel
 Verified locally: `npm run test:db` 126 of 126 on a fresh reset; `npm run check` exit 0 (106 unit tests, lint, types, build). Mutation: removing the provider-error deferral fails the expiry tests; disabling the webhook signature check fails 4 payment tests. Live: the internal runner route returns 404 without the secret and a summary with it; a bad signature returns 400.
 
 **Exit criterion not met yet.** Not every `06` §10 row has a passing test. Still open:
-- Refund workflow, refund execution, refund webhooks and the two-person threshold (3 rows). Deferred to Stage 5, because approval needs staff authentication. The late-success path already flags such money for staff.
+- Refund workflow, refund execution, refund webhooks and the two-person threshold (3 rows). Deferred to Stage 5, because approval needs staff authentication. The user accepted this deferral. The late-success path already flags such money for staff.
 - Customer return-page verify (2 rows). The verify logic is tested at the service level; the page is not built.
 - `payment.reconcile` and `refund.reconcile` jobs; `POST /orders/{id}/payments` to retry a FAILED payment (06 §3).
 - Paystack sandbox run: not done, because the sandbox cannot reach `api.paystack.co`. Needs test keys and a run in an environment with access.
