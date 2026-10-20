@@ -14,7 +14,7 @@ Recorded as of this commit. Update it at the end of every stage.
 | Architecture (Phase 2) | ✅ Written, awaiting approval | `docs/02-architecture.md`, `docs/03`, `docs/05`, `docs/06` |
 | Data model | ✅ Draft, validated with Prisma 7.10.1 | `prisma/schema.prisma` (39 models, 29 enums). **Not migrated.** |
 | UI/UX wireframes (Phase 3) | ✅ Written, awaiting review | `docs/04-ui-ux.md` |
-| Application code | 🟡 Stages 1–4 (core) | `src/`: Next.js 16 app. Catalogue, cart, delivery quote, checkout, order state machine, mock payments, Paystack adapter with signed webhooks, verify jobs and late-payment rules. See the stage sections below for what is not built. |
+| Application code | 🟡 Stage 1 scaffold, then Stages 2–4 core | `src/`: Next.js 16 app. Catalogue, cart, delivery quote, checkout, order state machine, mock payments, Paystack adapter with signed webhooks, verify jobs and late-payment rules. See the stage sections below for what is not built. |
 | Database migrations | 🟡 Stage 2 | `prisma/migrations/`: generated baseline (39 tables, 29 enums) and hand-written §9 constraints. Applied to a real PostgreSQL 16 in tests. Prisma `migrate deploy` and the drift check run in CI. |
 | Automated tests | 🟡 Stages 1–4 | Spec suite (`npm run test:spec`, 16 tests), unit tests (`npm run test:unit`, 106 across all unit-tested modules), database tests (`npm run test:db`, 126 across 9 files: constraints, tenant isolation, seed, cart, checkout, concurrency, payments, expiry, mock-pay HTTP), end-to-end tests (`npm run test:e2e`, Playwright, run in CI). |
 | Storefront, admin dashboard | 🟡 Storefront API only | Catalogue, cart, delivery quote and checkout APIs exist. No storefront pages beyond the placeholder, and no admin (Stages 5–6). |
