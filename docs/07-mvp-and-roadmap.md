@@ -12,10 +12,10 @@ Recorded as of this commit. Update it at the end of every stage.
 |---|---|---|
 | Product requirements (Phase 1) | ✅ Written, awaiting approval | `docs/01-product-requirements.md` |
 | Architecture (Phase 2) | ✅ Written, awaiting approval | `docs/02-architecture.md`, `docs/03`, `docs/05`, `docs/06` |
-| Data model | ✅ Draft, validated with Prisma 7.10.1 | `prisma/schema.prisma` (39 models, 29 enums). **Not migrated.** |
+| Data model | ✅ Draft, validated with Prisma 7.10.1 | `prisma/schema.prisma` (40 models, 29 enums). Migrated and tested against PostgreSQL 16 (Stage 2). |
 | UI/UX wireframes (Phase 3) | ✅ Written, awaiting review | `docs/04-ui-ux.md` |
 | Application code | 🟡 Stage 1 scaffold, then Stages 2–4 core | `src/`: Next.js 16 app. Catalogue, cart, delivery quote, checkout, order state machine, mock payments, Paystack adapter with signed webhooks, verify jobs and late-payment rules. See the stage sections below for what is not built. |
-| Database migrations | 🟡 Stage 2 | `prisma/migrations/`: generated baseline (39 tables, 29 enums) and hand-written §9 constraints. Applied to a real PostgreSQL 16 in tests. Prisma `migrate deploy` and the drift check run in CI. |
+| Database migrations | 🟡 Stage 2 | `prisma/migrations/`: generated baseline (40 tables, 29 enums) and hand-written §9 constraints. Applied to a real PostgreSQL 16 in tests. Prisma `migrate deploy` and the drift check run in CI. |
 | Automated tests | 🟡 Stages 1–4 | Spec suite (`npm run test:spec`, 16 tests), unit tests (`npm run test:unit`, 106 across all unit-tested modules), database tests (`npm run test:db`, 139 across 10 files: constraints, tenant isolation, seed, cart, checkout, concurrency, payments, expiry, reconciliation, return page, mock-pay HTTP), end-to-end tests (`npm run test:e2e`, Playwright, run in CI). |
 | Storefront, admin dashboard | 🟡 Storefront API only | Catalogue, cart, delivery quote and checkout APIs exist. No storefront pages beyond the placeholder, and no admin (Stages 5–6). |
 | WhatsApp integration | ⬜ Design only | Not connected to Meta. Mock adapter planned (Stage 7). |
@@ -144,6 +144,16 @@ Verified locally: `npm run test:db` 126 of 126 on a fresh reset; `npm run check`
 - Admin APIs from `02` §6.5, including masked customer data and audited reveal.
 - Notification outbox rows created with each change.
 - **Exit:** RBAC matrix tests pass; a deactivated staff member loses access on the next request; a stale transition returns 409; every mutation writes an audit row.
+
+**Status (Stage 5, first part: staff auth, RBAC, MFA, order changes):** built on `arena/336b5f77-application-software`. Verified locally against PostgreSQL 16.14: `npm run test:db` 175 of 175 on a fresh reset (new: `staff-auth.test.ts`, `admin-orders.test.ts`); `npm run test:unit` covers the permission matrix (every PRD §8 row for every role) and TOTP against the RFC 6238 vectors. Live on `next dev`: sign-in, the MFA gate, enrolment with a real authenticator code, replayed-code refusal, order change with `If-Match` (stale value → 409), illegal move → 422, sign-out.
+- Staff sign-in: Argon2id; generic error for every failure; lockout after 5 failures for 15 minutes (failed MFA codes count too); server-side sessions with 30-minute idle and 12-hour absolute timeouts; revocation by `tokenVersion`, deactivation, or sign-out; a deactivated member loses access on the next request.
+- TOTP MFA required for Owner, Admin and Finance before any permission is granted. Secrets encrypted with AES-256-GCM; a code is accepted once.
+- Order changes: `PATCH /api/v1/admin/orders/{id}/status` needs `If-Match` (428 without, 409 when stale). Fulfilment moves need `orders.fulfil`; cancelling an unpaid order needs `orders.cancel_unpaid` and releases stock. Every change writes an `OrderStatusEvent` and an `AuditLog` row in one transaction.
+- Masked customer reads; the full phone and email are revealed only by `POST …/customer/reveal` with a reason, for Owner, Admin and Support, and every reveal is audited.
+- `StaffSession` is a new table (migration `0001_baseline` regenerated from the schema, as the baseline check requires). Any database created before this change must be reset.
+- Development staff: `scripts/db/create-staff.mjs` (refuses production). Production staff management is not built.
+
+**Still open for Stage 5:** staff management (create, role change with the Owner-only rule, deactivate); customer OTP sessions and `GET /orders/{orderNumber}` for customers; the refund workflow (request, two-person approval, execution, `refund.reconcile`); the retry endpoint `POST /orders/{id}/payments`; notification outbox rows (depend on WhatsApp templates, Stage 7); the broader admin APIs in `02` §6.5 (catalogue and inventory writes, customer list, payments view, audit log view). Exit criterion not met yet.
 
 ### Stage 6 — Storefront and admin UI (L)
 

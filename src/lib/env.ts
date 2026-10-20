@@ -25,6 +25,9 @@ const EnvSchema = z
     // Bearer token for POST /api/internal/jobs/run, which a scheduler calls to retry payment jobs.
     // Unset means the endpoint does not exist.
     JOB_RUNNER_SECRET: z.string().min(32, { error: 'must be at least 32 characters when set' }).optional(),
+    // Encrypts TOTP secrets for staff MFA (AES-256-GCM, key derived with HKDF). Required in production
+    // before any MFA enrolment; the MFA routes answer 503 without it rather than storing secrets in clear.
+    SESSION_ENCRYPTION_KEY: z.string().min(32, { error: 'must be at least 32 characters when set' }).optional(),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && !isSecureOrLocal(env.APP_BASE_URL)) {

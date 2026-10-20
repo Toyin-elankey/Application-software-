@@ -321,6 +321,7 @@ model StaffUser {
   tokenVersion     Int       @default(0) // bump to revoke all sessions
   mfaEnabled       Boolean   @default(false)
   mfaSecretEnc     String?   @db.VarChar(512) // encrypted TOTP secret (Stage 5)
+  mfaLastUsedStep  BigInt? // last accepted TOTP time step; a code is accepted once
   failedLoginCount Int       @default(0)
   lockedUntil      DateTime? @db.Timestamptz(6)
   isActive         Boolean   @default(true)
@@ -331,6 +332,27 @@ model StaffUser {
   memberships           StaffMembership[]
   assignedConversations Conversation[]
   inventoryMovements    InventoryMovement[]
+  sessions              StaffSession[]
+}
+
+// Staff session (Stage 5). The raw token is only in the cookie; the database keeps its SHA-256.
+model StaffSession {
+  id                String    @id @default(uuid()) @db.Uuid
+  staffUserId       String    @db.Uuid
+  tokenHash         String    @unique @db.VarChar(64)
+  tokenVersion      Int // staff user's tokenVersion when the session was created
+  createdAt         DateTime  @default(now()) @db.Timestamptz(6)
+  lastSeenAt        DateTime  @db.Timestamptz(6)
+  idleExpiresAt     DateTime  @db.Timestamptz(6)
+  absoluteExpiresAt DateTime  @db.Timestamptz(6)
+  mfaVerifiedAt     DateTime? @db.Timestamptz(6)
+  revokedAt         DateTime? @db.Timestamptz(6)
+  ip                String?   @db.VarChar(64)
+  userAgent         String?   @db.VarChar(255)
+
+  staffUser StaffUser @relation(fields: [staffUserId], references: [id], onDelete: Cascade)
+
+  @@index([staffUserId])
 }
 
 model StaffMembership {

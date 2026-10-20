@@ -1,6 +1,6 @@
 # 03 — Data Model (Phase 2)
 
-The authoritative schema draft is [`prisma/schema.prisma`](../prisma/schema.prisma) (39 models, 29 enums, validated with Prisma 7.10.1). This document explains the design, the rules, and what Prisma cannot express, which must go in hand-written SQL migrations.
+The authoritative schema draft is [`prisma/schema.prisma`](../prisma/schema.prisma) (40 models, 29 enums, validated with Prisma 7.10.1). This document explains the design, the rules, and what Prisma cannot express, which must go in hand-written SQL migrations.
 
 ---
 

@@ -28,7 +28,8 @@ type Rule = { from: OrderStatus; to: OrderStatus; actors: readonly Actor[] };
 // - A provider event may move an order out for delivery or deliver it (SYSTEM), as the PRD allows.
 export const TRANSITIONS: readonly Rule[] = [
   { from: 'PENDING_PAYMENT', to: 'PAYMENT_CONFIRMED', actors: ['SYSTEM'] },
-  { from: 'PENDING_PAYMENT', to: 'CANCELLED', actors: ['SYSTEM', 'CUSTOMER'] },
+  // STAFF: PRD §8 lets Owner, Admin, Manager and Support cancel an unpaid order.
+  { from: 'PENDING_PAYMENT', to: 'CANCELLED', actors: ['SYSTEM', 'CUSTOMER', 'STAFF'] },
   { from: 'PAYMENT_CONFIRMED', to: 'CONFIRMED', actors: ['STAFF'] },
   { from: 'PAYMENT_CONFIRMED', to: 'REFUND_PENDING', actors: ['STAFF', 'CUSTOMER'] },
   { from: 'CONFIRMED', to: 'REFUND_PENDING', actors: ['STAFF'] },

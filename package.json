@@ -25,6 +25,7 @@
     "check": "npm run prisma:generate && npm run db:baseline:check && npm run lint && npm run typecheck && npm run test && npm run prisma:validate && npm run build"
   },
   "dependencies": {
+    "@node-rs/argon2": "^2.2.2",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
     "next": "16.4.2",

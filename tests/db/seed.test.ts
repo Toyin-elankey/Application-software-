@@ -18,7 +18,8 @@ async function counts(p: PrismaClient) {
     products: await p.product.count({ where: sample }),
     variants: await p.productVariant.count({ where: sample }),
     zones: await p.deliveryZone.count({ where: sample }),
-    staff: await p.staffMembership.count({ where: sample }),
+    // Only the seed's own accounts: other test files add staff to this business too.
+    staff: await p.staffMembership.count({ where: { ...sample, staffUser: { email: { endsWith: '@sample.invalid' } } } }),
   };
 }
 
@@ -58,7 +59,8 @@ describe('seed', () => {
   });
 
   it('gives staff a password hash that matches no password', async () => {
-    const staff = await prisma.staffUser.findMany({ select: { passwordHash: true } });
+    const staff = await prisma.staffUser.findMany({ where: { email: { endsWith: '@sample.invalid' } }, select: { passwordHash: true } });
+    expect(staff.length).toBeGreaterThan(0);
     for (const s of staff) expect(s.passwordHash.startsWith('!')).toBe(true);
   });
 });
