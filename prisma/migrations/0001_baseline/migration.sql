@@ -77,6 +77,7 @@ CREATE TABLE "StaffUser" (
     "tokenVersion" INTEGER NOT NULL DEFAULT 0,
     "mfaEnabled" BOOLEAN NOT NULL DEFAULT FALSE,
     "mfaSecretEnc" VARCHAR(512),
+    "mfaLastUsedStep" BIGINT,
     "failedLoginCount" INTEGER NOT NULL DEFAULT 0,
     "lockedUntil" TIMESTAMPTZ(6),
     "isActive" BOOLEAN NOT NULL DEFAULT TRUE,
@@ -86,6 +87,24 @@ CREATE TABLE "StaffUser" (
     CONSTRAINT "StaffUser_pkey" PRIMARY KEY ("id")
 );
 CREATE UNIQUE INDEX "StaffUser_email_key" ON "StaffUser"("email");
+
+CREATE TABLE "StaffSession" (
+    "id" UUID NOT NULL,
+    "staffUserId" UUID NOT NULL,
+    "tokenHash" VARCHAR(64) NOT NULL,
+    "tokenVersion" INTEGER NOT NULL,
+    "createdAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastSeenAt" TIMESTAMPTZ(6) NOT NULL,
+    "idleExpiresAt" TIMESTAMPTZ(6) NOT NULL,
+    "absoluteExpiresAt" TIMESTAMPTZ(6) NOT NULL,
+    "mfaVerifiedAt" TIMESTAMPTZ(6),
+    "revokedAt" TIMESTAMPTZ(6),
+    "ip" VARCHAR(64),
+    "userAgent" VARCHAR(255),
+    CONSTRAINT "StaffSession_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX "StaffSession_tokenHash_key" ON "StaffSession"("tokenHash");
+CREATE INDEX "StaffSession_staffUserId_idx" ON "StaffSession"("staffUserId");
 
 CREATE TABLE "StaffMembership" (
     "id" UUID NOT NULL,
@@ -685,6 +704,7 @@ CREATE INDEX "AiToolInvocation_businessId_toolName_createdAt_idx" ON "AiToolInvo
 
 -- Foreign keys
 ALTER TABLE "BusinessSettings" ADD CONSTRAINT "BusinessSettings_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "StaffSession" ADD CONSTRAINT "StaffSession_staffUserId_fkey" FOREIGN KEY ("staffUserId") REFERENCES "StaffUser"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "StaffMembership" ADD CONSTRAINT "StaffMembership_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "StaffMembership" ADD CONSTRAINT "StaffMembership_staffUserId_fkey" FOREIGN KEY ("staffUserId") REFERENCES "StaffUser"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "Customer" ADD CONSTRAINT "Customer_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -4,7 +4,7 @@ import { ACTORS, canTransition, ORDER_STATUSES, TRANSITIONS, type Actor, type Or
 // The complete expected behaviour, written out independently of TRANSITIONS so a wrong table entry fails.
 const ALLOWED: Record<string, Actor[]> = {
   'PENDING_PAYMENT>PAYMENT_CONFIRMED': ['SYSTEM'],
-  'PENDING_PAYMENT>CANCELLED': ['SYSTEM', 'CUSTOMER'],
+  'PENDING_PAYMENT>CANCELLED': ['SYSTEM', 'CUSTOMER', 'STAFF'],
   'PAYMENT_CONFIRMED>CONFIRMED': ['STAFF'],
   'PAYMENT_CONFIRMED>REFUND_PENDING': ['STAFF', 'CUSTOMER'],
   'CONFIRMED>REFUND_PENDING': ['STAFF'],

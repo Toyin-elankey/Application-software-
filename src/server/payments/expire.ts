@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import { logger } from '@/lib/logger';
-import { canTransition } from '@/server/orders/stateMachine';
+import { cancelUnpaidOrderTx } from '@/server/orders/cancel';
 import type { TenantScope } from '@/server/tenant';
 import { applyVerifiedPayment } from './confirm';
 import type { PaymentProvider } from './provider';
@@ -64,8 +64,14 @@ export async function expireDueReservations(
       summary.deferred += 1;
       continue;
     }
-    const result = await cancelForExpiry(db, scope, order.id, now);
-    if (result === 'cancelled') summary.cancelled += 1;
+    try {
+      const result = await cancelForExpiry(db, scope, order.id, now);
+      if (result === 'cancelled') summary.cancelled += 1;
+    } catch (error) {
+      // One order that changed under us is retried on the next sweep; the others still run.
+      logger.warn({ msg: 'expiry cancellation failed; order left for the next sweep', orderId: order.id, error: error instanceof Error ? error.message : 'unknown' });
+      summary.deferred += 1;
+    }
   }
   return summary;
 }
@@ -73,74 +79,14 @@ export async function expireDueReservations(
 async function cancelForExpiry(db: PrismaClient, scope: TenantScope, orderId: string, now: Date): Promise<'cancelled' | 'skipped'> {
   return db.$transaction(
     async (tx) => {
-      const payments = await tx.$queryRaw<{ id: string; status: string }[]>`
-        SELECT id, status::text AS status FROM \"Payment\"
-        WHERE \"orderId\" = ${orderId}::uuid AND \"businessId\" = ${scope.businessId}::uuid
-        ORDER BY id FOR UPDATE`;
-      // A payment confirmed while the sweep was verifying wins. The order is not cancelled.
-      if (payments.some((p) => p.status === 'SUCCEEDED')) return 'skipped';
-
-      const [order] = await tx.$queryRaw<{ id: string; status: string; version: number }[]>`
-        SELECT id, status::text AS status, version FROM \"Order\"
-        WHERE id = ${orderId}::uuid AND \"businessId\" = ${scope.businessId}::uuid FOR UPDATE`;
-      if (!order || order.status !== 'PENDING_PAYMENT') return 'skipped';
-
-      const transition = canTransition('PENDING_PAYMENT', 'CANCELLED', 'SYSTEM');
-      if (!transition.ok) throw new Error(transition.reason);
-
-      // Release the reservation: reserved goes down, and a movement records it.
-      const items = await tx.orderItem.findMany({
-        where: { orderId, variantId: { not: null } },
-        select: { variantId: true, quantity: true, sku: true },
-        orderBy: { variantId: 'asc' },
+      const outcome = await cancelUnpaidOrderTx(tx, scope, orderId, {
+        now,
+        reason: 'payment_timeout',
+        failureReason: 'reservation_expired',
+        actorType: 'SYSTEM',
+        actorId: null,
       });
-      for (const item of items) {
-        if (!item.variantId) continue;
-        const variant = await tx.productVariant.findFirst({
-          where: { id: item.variantId, businessId: scope.businessId },
-          select: { trackInventory: true },
-        });
-        if (!variant?.trackInventory) continue;
-        const released = await tx.$executeRaw`
-          UPDATE \"ProductVariant\" SET reserved = reserved - ${item.quantity}, \"updatedAt\" = now()
-          WHERE id = ${item.variantId}::uuid AND \"businessId\" = ${scope.businessId}::uuid AND reserved >= ${item.quantity}`;
-        if (released !== 1) throw new Error(`reservation release refused for ${item.sku}: books are inconsistent`);
-        await tx.inventoryMovement.create({
-          data: {
-            businessId: scope.businessId,
-            variantId: item.variantId,
-            delta: item.quantity,
-            reason: 'RESERVATION_RELEASED',
-            orderId,
-            actorType: 'SYSTEM',
-            note: 'reservation expired',
-          },
-        });
-      }
-
-      // Awaiting payments are closed as abandoned. A later success is still processed (06 §5).
-      await tx.payment.updateMany({
-        where: { orderId, businessId: scope.businessId, status: { in: ['INITIALIZED', 'PENDING'] } },
-        data: { status: 'ABANDONED', failureReason: 'reservation_expired', verifiedAt: now },
-      });
-
-      const moved = await tx.order.updateMany({
-        where: { id: orderId, businessId: scope.businessId, version: order.version, status: 'PENDING_PAYMENT' },
-        data: { status: 'CANCELLED', cancelledAt: now, cancelReason: 'payment_timeout', version: { increment: 1 } },
-      });
-      if (moved.count !== 1) throw new Error('order changed during expiry; retry');
-
-      await tx.orderStatusEvent.create({
-        data: {
-          orderId,
-          fromStatus: 'PENDING_PAYMENT',
-          toStatus: 'CANCELLED',
-          actorType: 'SYSTEM',
-          reason: 'payment_timeout',
-          metadata: { releasedLines: items.length },
-        },
-      });
-      return 'cancelled';
+      return outcome === 'cancelled' ? 'cancelled' : 'skipped';
     },
     { timeout: 15_000, maxWait: 10_000 },
   );
