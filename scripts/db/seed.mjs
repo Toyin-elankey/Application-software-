@@ -38,8 +38,10 @@ const PRODUCTS = [
 const SIZES = ['S', 'M'];
 
 const ZONES = [
-  { name: 'Lagos Mainland (sample)', feeMinor: 150000n, etaLabel: 'Sample estimate: 1-2 days', sortOrder: 1 },
-  { name: 'Lagos Island (sample)', feeMinor: 200000n, etaLabel: 'Sample estimate: 2-3 days', sortOrder: 2 },
+  // Zones are matched by state (Stage 3), so both sample zones list Lagos. The first (lowest sortOrder)
+  // wins until zones can be split by area; see docs/07.
+  { name: 'Lagos Mainland (sample)', states: ['Lagos'], feeMinor: 150000n, etaLabel: 'Sample estimate: 1-2 days', sortOrder: 1 },
+  { name: 'Lagos Island (sample)', states: ['Lagos'], feeMinor: 200000n, etaLabel: 'Sample estimate: 2-3 days', sortOrder: 2 },
 ];
 
 const STAFF = [
@@ -127,8 +129,19 @@ export async function seed(prisma) {
     const existing = await prisma.deliveryZone.findFirst({ where: { businessId, name: z.name } });
     if (!existing) {
       await prisma.deliveryZone.create({
-        data: { businessId, name: z.name, feeMinor: z.feeMinor, etaLabel: z.etaLabel, isActive: true, sortOrder: z.sortOrder },
+        data: {
+          businessId,
+          name: z.name,
+          states: z.states,
+          feeMinor: z.feeMinor,
+          etaLabel: z.etaLabel,
+          isActive: true,
+          sortOrder: z.sortOrder,
+        },
       });
+    } else if (existing.states.length === 0) {
+      // Sample data from before zones had states. Fill the coverage in; never overwrite staff edits.
+      await prisma.deliveryZone.update({ where: { id: existing.id }, data: { states: z.states } });
     }
   }
 
