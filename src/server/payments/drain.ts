@@ -2,6 +2,7 @@ import type { PrismaClient } from '@prisma/client';
 import { logger } from '@/lib/logger';
 import { runDueJobs, type RunSummary } from '@/server/jobs/runner';
 import { expireDueReservations, type ExpirySummary } from './expire';
+import { reconcileStalePayments, type ReconcileSummary } from './reconcile';
 import { getPaymentProvider } from './resolve';
 import { paymentVerifyHandler } from './verifyJob';
 
@@ -25,7 +26,7 @@ export async function drainPaymentJobs(db: PrismaClient, options: { limit?: numb
   }
 }
 
-export type MaintenanceSummary = { jobs: RunSummary | null; expiry: ExpirySummary | null };
+export type MaintenanceSummary = { jobs: RunSummary | null; expiry: ExpirySummary | null; reconcile: ReconcileSummary | null };
 
 /** Expiry sweep, then the due jobs. Each part is independent: one failing does not stop the other. */
 export async function runPaymentMaintenance(db: PrismaClient, options: { now?: Date; limit?: number } = {}): Promise<MaintenanceSummary> {
@@ -43,6 +44,15 @@ export async function runPaymentMaintenance(db: PrismaClient, options: { now?: D
     logger.error({ msg: 'reservation expiry sweep failed', error: error instanceof Error ? error.message : 'unknown' });
   }
 
+  let reconcile: ReconcileSummary | null = null;
+  if (provider) {
+    try {
+      reconcile = await reconcileStalePayments(db, provider, { now: options.now, limit: options.limit });
+    } catch (error) {
+      logger.error({ msg: 'reconciliation failed', error: error instanceof Error ? error.message : 'unknown' });
+    }
+  }
+
   const jobs = await drainPaymentJobs(db, { limit: options.limit, now: options.now });
-  return { jobs, expiry };
+  return { jobs, expiry, reconcile };
 }

@@ -16,7 +16,7 @@ Recorded as of this commit. Update it at the end of every stage.
 | UI/UX wireframes (Phase 3) | ✅ Written, awaiting review | `docs/04-ui-ux.md` |
 | Application code | 🟡 Stage 1 scaffold, then Stages 2–4 core | `src/`: Next.js 16 app. Catalogue, cart, delivery quote, checkout, order state machine, mock payments, Paystack adapter with signed webhooks, verify jobs and late-payment rules. See the stage sections below for what is not built. |
 | Database migrations | 🟡 Stage 2 | `prisma/migrations/`: generated baseline (39 tables, 29 enums) and hand-written §9 constraints. Applied to a real PostgreSQL 16 in tests. Prisma `migrate deploy` and the drift check run in CI. |
-| Automated tests | 🟡 Stages 1–4 | Spec suite (`npm run test:spec`, 16 tests), unit tests (`npm run test:unit`, 106 across all unit-tested modules), database tests (`npm run test:db`, 126 across 9 files: constraints, tenant isolation, seed, cart, checkout, concurrency, payments, expiry, mock-pay HTTP), end-to-end tests (`npm run test:e2e`, Playwright, run in CI). |
+| Automated tests | 🟡 Stages 1–4 | Spec suite (`npm run test:spec`, 16 tests), unit tests (`npm run test:unit`, 106 across all unit-tested modules), database tests (`npm run test:db`, 139 across 10 files: constraints, tenant isolation, seed, cart, checkout, concurrency, payments, expiry, reconciliation, return page, mock-pay HTTP), end-to-end tests (`npm run test:e2e`, Playwright, run in CI). |
 | Storefront, admin dashboard | 🟡 Storefront API only | Catalogue, cart, delivery quote and checkout APIs exist. No storefront pages beyond the placeholder, and no admin (Stages 5–6). |
 | WhatsApp integration | ⬜ Design only | Not connected to Meta. Mock adapter planned (Stage 7). |
 | Payments | 🟡 Stage 4 core | Mock provider (dev, CI, demos only) and a Paystack adapter written and tested with fixtures and a fake provider. **Not run against Paystack's sandbox**: this sandbox cannot reach `api.paystack.co`. Refunds, the customer return-page verify and the reconcile jobs are not built. |
@@ -125,13 +125,15 @@ Each stage ends with a merge to the working branch and passing CI. Sizes are rel
 - Late success is applied on FAILED and ABANDONED payments, not refused (06 §5). The verify job checks every payment that is not yet SUCCEEDED, so a success after a failed attempt is never dropped.
 - Reservation expiry (`src/server/payments/expire.ts`) is a sweep run from `runPaymentMaintenance`, not a separate `payment.expire` job type. An expired order gets one final verify where a payment could still succeed. A provider error defers the cancellation; it never cancels. A verified success confirms the order. Otherwise the order is cancelled with reason `payment_timeout`, its stock is released with `RESERVATION_RELEASED` movements, and its awaiting payments are ABANDONED.
 - The mock page sends a signed `charge.success` or `charge.failed` through the real webhook intake, then runs the due jobs. ABANDONED is verified directly, because Paystack sends no abandon event.
+- Reconciliation (`src/server/payments/reconcile.ts`, 06 §4.5): payments still awaiting a result 10 minutes after creation are verified; provider errors defer.
+- Customer return page `GET /orders/{orderNumber}/payment-return` (06 §4.2): verifies with the provider and applies the result with the same rules. It never marks an order paid from the browser request alone. Reloads do not call the provider once the payment is settled.
 
 Verified locally: `npm run test:db` 126 of 126 on a fresh reset; `npm run check` exit 0 (106 unit tests, lint, types, build). Mutation: removing the provider-error deferral fails the expiry tests; disabling the webhook signature check fails 4 payment tests. Live: the internal runner route returns 404 without the secret and a summary with it; a bad signature returns 400.
 
 **Exit criterion not met yet.** Not every `06` §10 row has a passing test. Still open:
 - Refund workflow, refund execution, refund webhooks and the two-person threshold (3 rows). Deferred to Stage 5, because approval needs staff authentication. The user accepted this deferral. The late-success path already flags such money for staff.
-- Customer return-page verify (2 rows). The verify logic is tested at the service level; the page is not built.
-- `payment.reconcile` and `refund.reconcile` jobs; `POST /orders/{id}/payments` to retry a FAILED payment (06 §3).
+- `refund.reconcile` job (refunds come with Stage 5).
+- `POST /orders/{id}/payments` to retry a FAILED payment (06 §3). Needs an authenticated customer, so it comes with Stage 5 customer sessions.
 - Paystack sandbox run: not done, because the sandbox cannot reach `api.paystack.co`. Needs test keys and a run in an environment with access.
 
 ### Stage 5 — Identity, orders, admin API (L)
