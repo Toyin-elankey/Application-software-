@@ -17,6 +17,7 @@ export type StaffMemberView = {
   role: StaffRoleName;
   isActive: boolean;
   mfaEnabled: boolean;
+  mustChangePassword: boolean;
   lastLoginAt: string | null;
   lockedUntil: string | null;
   createdAt: string;
@@ -28,6 +29,7 @@ const USER_SELECT = {
   fullName: true,
   isActive: true,
   mfaEnabled: true,
+  mustChangePassword: true,
   lastLoginAt: true,
   lockedUntil: true,
   createdAt: true,
@@ -39,6 +41,7 @@ type UserRow = {
   fullName: string;
   isActive: boolean;
   mfaEnabled: boolean;
+  mustChangePassword: boolean;
   lastLoginAt: Date | null;
   lockedUntil: Date | null;
   createdAt: Date;
@@ -52,6 +55,7 @@ function toView(role: StaffRoleName, user: UserRow): StaffMemberView {
     role,
     isActive: user.isActive,
     mfaEnabled: user.mfaEnabled,
+    mustChangePassword: user.mustChangePassword,
     lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
     lockedUntil: user.lockedUntil?.toISOString() ?? null,
     createdAt: user.createdAt.toISOString(),
@@ -89,8 +93,8 @@ export async function listStaff(db: PrismaClient, actor: StaffActor): Promise<St
 
 /**
  * Creates a staff account with a generated temporary password. The password is returned once, in this
- * response, and is never stored in plain text. There is no password-change endpoint yet, so the member
- * should be given the password in person and asked to change it when that endpoint exists.
+ * response, and is never stored in plain text. The account is marked `mustChangePassword`: the member
+ * can sign in, but every route except the password change refuses them until they choose a new password.
  */
 export async function createStaffMember(
   db: PrismaClient,
@@ -105,7 +109,7 @@ export async function createStaffMember(
   try {
     return await db.$transaction(async (tx) => {
       const user = await tx.staffUser.create({
-        data: { email, fullName: input.fullName.trim(), passwordHash },
+        data: { email, fullName: input.fullName.trim(), passwordHash, mustChangePassword: true },
         select: USER_SELECT,
       });
       await tx.staffMembership.create({ data: { businessId: actor.businessId, staffUserId: user.id, role: input.role } });

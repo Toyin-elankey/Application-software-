@@ -10,7 +10,7 @@ export function POST(request: Request) {
   return handle(async () => {
     requireJsonRequest(request);
     const { db } = await storeAndDb();
-    const actor = await requireStaff(db, request, { allowMfaSetup: true });
+    const actor = await requireStaff(db, request, { allowMfaSetup: true, allowPasswordChange: true });
     await signOut(db, actor);
     return jsonResponse({ ok: true }, 200, { 'Set-Cookie': staffClearCookie(), 'Cache-Control': 'no-store' });
   });

@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { getEnv } from '@/lib/env';
 import { AppError } from '@/server/http/problem';
-import { DUMMY_HASH, verifyPassword } from './password';
+import { DUMMY_HASH, hashPassword, MIN_PASSWORD_LENGTH, passwordProblem, verifyPassword } from './password';
 import { requiresMfa, type StaffRoleName } from './permissions';
 import { base32Encode, decryptSecret, encryptSecret, matchTotp, newTotpSecret, otpauthUri } from './totp';
 
@@ -32,6 +32,8 @@ export type StaffActor = {
   sessionId: string;
   mfaEnabled: boolean;
   mfaVerified: boolean;
+  /** True after a temporary password was issued and not yet changed. Only the password, session and logout routes accept it. */
+  mustChangePassword: boolean;
   ip: string | null;
   userAgent: string | null;
 };
@@ -148,6 +150,7 @@ export async function resolveStaffActor(
           isActive: true,
           tokenVersion: true,
           mfaEnabled: true,
+          mustChangePassword: true,
           memberships: { where: { businessId }, select: { role: true } },
         },
       },
@@ -176,6 +179,7 @@ export async function resolveStaffActor(
     sessionId: session.id,
     mfaEnabled: user.mfaEnabled,
     mfaVerified: session.mfaVerifiedAt !== null,
+    mustChangePassword: user.mustChangePassword,
     ip: meta.ip,
     userAgent: meta.userAgent,
   };
@@ -191,6 +195,58 @@ export async function signOut(db: PrismaClient, actor: StaffActor, now = new Dat
 /** Ends every session of a staff member at once (deactivation, password reset, role change). */
 export async function revokeAllSessions(db: Prisma.TransactionClient | PrismaClient, staffUserId: string): Promise<void> {
   await db.staffUser.update({ where: { id: staffUserId }, data: { tokenVersion: { increment: 1 } } });
+}
+
+// ---- password change ----
+
+/**
+ * Changes the signed-in member's password. Needs the current password: a wrong one counts toward the
+ * lockout, the same as a wrong sign-in. Clears `mustChangePassword`, ends the member's other sessions
+ * (this one stays), and writes an audit row that does not contain either password.
+ */
+export async function changePassword(
+  db: PrismaClient,
+  actor: StaffActor,
+  input: { currentPassword: string; newPassword: string },
+  now = new Date(),
+): Promise<{ sessionsRevoked: number }> {
+  const problem = passwordProblem(input.newPassword);
+  if (problem === 'too_short') {
+    throw new AppError(422, 'weak_password', `Use at least ${MIN_PASSWORD_LENGTH} characters.`);
+  }
+  if (problem === 'too_long') throw new AppError(422, 'weak_password', 'Use at most 256 characters.');
+
+  const user = await db.staffUser.findUniqueOrThrow({
+    where: { id: actor.staffUserId },
+    select: { passwordHash: true, lockedUntil: true },
+  });
+  if (user.lockedUntil && user.lockedUntil > now) throw lockedOut();
+
+  if (!(await verifyPassword(user.passwordHash, input.currentPassword))) {
+    await recordFailure(db, actor.staffUserId, now);
+    throw new AppError(422, 'current_password_incorrect', 'The current password is not correct.');
+  }
+  if (await verifyPassword(user.passwordHash, input.newPassword)) {
+    throw new AppError(422, 'password_unchanged', 'Choose a password that is different from the current one.');
+  }
+
+  const passwordHash = await hashPassword(input.newPassword);
+  return db.$transaction(async (tx) => {
+    // Conditional on the hash checked above: two changes at once cannot both succeed.
+    const moved = await tx.staffUser.updateMany({
+      where: { id: actor.staffUserId, passwordHash: user.passwordHash },
+      data: { passwordHash, mustChangePassword: false, failedLoginCount: 0 },
+    });
+    if (moved.count !== 1) {
+      throw new AppError(409, 'password_changed_elsewhere', 'The password was changed from another session. Sign in again.');
+    }
+    const ended = await tx.staffSession.updateMany({
+      where: { staffUserId: actor.staffUserId, revokedAt: null, id: { not: actor.sessionId } },
+      data: { revokedAt: now },
+    });
+    await audit(tx, actor.businessId, actor.staffUserId, 'STAFF_PASSWORD_CHANGED', 'StaffUser', actor.staffUserId, { sessionsRevoked: ended.count }, actor.ip, actor.userAgent, now);
+    return { sessionsRevoked: ended.count };
+  });
 }
 
 // ---- MFA (TOTP) ----
