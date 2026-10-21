@@ -135,6 +135,7 @@ CREATE UNIQUE INDEX "Customer_businessId_phoneE164_key" ON "Customer"("businessI
 CREATE TABLE "CustomerSession" (
     "id" UUID NOT NULL,
     "customerId" UUID NOT NULL,
+    "scopeOrderId" UUID,
     "tokenHash" VARCHAR(64) NOT NULL,
     "expiresAt" TIMESTAMPTZ(6) NOT NULL,
     "revokedAt" TIMESTAMPTZ(6),

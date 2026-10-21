@@ -31,6 +31,13 @@ const EnvSchema = z
     // Refunds above this amount (kobo, integer) need a second person to approve them (06 §4.6). Unset means
     // the default of ₦50,000. The business sets the real value; see docs/06 §4.6.
     REFUND_APPROVAL_THRESHOLD_MINOR: z.string().regex(/^\d{1,15}$/, { error: 'must be a whole number of kobo' }).optional(),
+    // Keys the HMAC of customer OTP codes (02 §8). Production must set it; outside production a development key is used.
+    OTP_HMAC_KEY: z.string().min(32, { error: 'must be at least 32 characters when set' }).optional(),
+    // Where one-time codes are delivered. MOCK writes nothing unless OTP_MOCK_OUTBOX_FILE is set. Unset in production
+    // means no delivery channel exists yet (WhatsApp templates are not approved), so OTP requests answer 503.
+    OTP_DELIVERY: z.enum(['MOCK']).optional(),
+    // Development aid: the mock appends {phone, code} lines to this file so a tester can finish a sign-in.
+    OTP_MOCK_OUTBOX_FILE: z.string().min(1).max(500).optional(),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && !isSecureOrLocal(env.APP_BASE_URL)) {
@@ -53,6 +60,12 @@ const EnvSchema = z
         path: ['PAYSTACK_SECRET_KEY'],
         message: 'is required when PAYMENT_PROVIDER is PAYSTACK',
       });
+    }
+    if (env.NODE_ENV === 'production' && env.OTP_DELIVERY === 'MOCK') {
+      ctx.addIssue({ code: 'custom', path: ['OTP_DELIVERY'], message: 'the mock OTP delivery is never allowed in production' });
+    }
+    if (env.NODE_ENV === 'production' && env.OTP_MOCK_OUTBOX_FILE) {
+      ctx.addIssue({ code: 'custom', path: ['OTP_MOCK_OUTBOX_FILE'], message: 'must not be set in production' });
     }
     if (env.PAYSTACK_SECRET_KEY) {
       const key = env.PAYSTACK_SECRET_KEY;
