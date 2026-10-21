@@ -74,6 +74,7 @@ CREATE TABLE "StaffUser" (
     "email" VARCHAR(254) NOT NULL,
     "fullName" VARCHAR(120) NOT NULL,
     "passwordHash" VARCHAR(255) NOT NULL,
+    "mustChangePassword" BOOLEAN NOT NULL DEFAULT FALSE,
     "tokenVersion" INTEGER NOT NULL DEFAULT 0,
     "mfaEnabled" BOOLEAN NOT NULL DEFAULT FALSE,
     "mfaSecretEnc" VARCHAR(512),

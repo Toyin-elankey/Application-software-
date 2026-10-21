@@ -326,6 +326,7 @@ All JSON APIs live under `/api/v1`. Errors use RFC 9457 `application/problem+jso
 | POST | `/admin/refunds/{id}/approve` | `refunds.approve` |
 | POST | `/admin/refunds/{id}/execute` | `refunds.approve` |
 | GET | `/admin/orders/{id}/refunds` | `payments.read` (implemented as `payments.view`) |
+| POST | `/admin/auth/password` | Staff session (MFA setup not required; allowed while a temporary password is in use) | Change own password with the current one. Other sessions end. The only route a temporary password can use, apart from session and logout. |
 | GET | `/admin/payments` | `payments.read` |
 | GET | `/admin/customers?q=` | `customers.read` (masked) |
 | POST | `/admin/customers/{id}/reveal` | `pii.reveal` (audited, reason required) |

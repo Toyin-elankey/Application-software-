@@ -6,8 +6,8 @@ import { hasPermission, requiresMfa, type Permission } from './permissions';
 import { resolveStaffActor, STAFF_COOKIE, type StaffActor } from './staff';
 
 // Route guard for staff APIs. Every admin route calls requireStaff before reading or writing anything.
-// The check order is fixed: session, then MFA for roles that need it, then the permission. The first
-// failure answers, so a caller never learns more than the step it failed.
+// The check order is fixed: session, then the temporary-password step, then MFA for roles that need it,
+// then the permission. The first failure answers, so a caller never learns more than the step it failed.
 
 function cookieSecure(): boolean {
   return getEnv().APP_BASE_URL.startsWith('https://');
@@ -52,11 +52,16 @@ export function requireJsonRequest(request: Request): void {
 export async function requireStaff(
   db: PrismaClient,
   request: Request,
-  options: { permission?: Permission; allowMfaSetup?: boolean } = {},
+  options: { permission?: Permission; allowMfaSetup?: boolean; allowPasswordChange?: boolean } = {},
 ): Promise<StaffActor> {
   const store = await getStoreContext(db);
   const actor = await resolveStaffActor(db, store.scope.businessId, staffTokenFrom(request), clientMeta(request));
   if (!actor) throw new AppError(401, 'unauthenticated', 'Sign in to continue.');
+
+  // A temporary password must be replaced before anything else, including MFA setup.
+  if (actor.mustChangePassword && !options.allowPasswordChange) {
+    throw new AppError(403, 'password_change_required', 'Change your temporary password before continuing.');
+  }
 
   if (requiresMfa(actor.role) && !actor.mfaVerified && !options.allowMfaSetup) {
     throw new AppError(403, actor.mfaEnabled ? 'mfa_required' : 'mfa_enrolment_required', 'Two-factor sign-in must be completed first.', {

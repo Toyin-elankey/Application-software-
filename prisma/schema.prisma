@@ -314,20 +314,21 @@ model BusinessSettings {
 }
 
 model StaffUser {
-  id               String    @id @default(uuid()) @db.Uuid
-  email            String    @unique @db.VarChar(254)
-  fullName         String    @db.VarChar(120)
-  passwordHash     String    @db.VarChar(255) // Argon2id; never returned by any API
-  tokenVersion     Int       @default(0) // bump to revoke all sessions
-  mfaEnabled       Boolean   @default(false)
-  mfaSecretEnc     String?   @db.VarChar(512) // encrypted TOTP secret (Stage 5)
-  mfaLastUsedStep  BigInt? // last accepted TOTP time step; a code is accepted once
-  failedLoginCount Int       @default(0)
-  lockedUntil      DateTime? @db.Timestamptz(6)
-  isActive         Boolean   @default(true)
-  lastLoginAt      DateTime? @db.Timestamptz(6)
-  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt        DateTime  @updatedAt @db.Timestamptz(6)
+  id                 String    @id @default(uuid()) @db.Uuid
+  email              String    @unique @db.VarChar(254)
+  fullName           String    @db.VarChar(120)
+  passwordHash       String    @db.VarChar(255) // Argon2id; never returned by any API
+  mustChangePassword Boolean   @default(false) // set for a temporary password; cleared by the password change
+  tokenVersion       Int       @default(0) // bump to revoke all sessions
+  mfaEnabled         Boolean   @default(false)
+  mfaSecretEnc       String?   @db.VarChar(512) // encrypted TOTP secret (Stage 5)
+  mfaLastUsedStep    BigInt? // last accepted TOTP time step; a code is accepted once
+  failedLoginCount   Int       @default(0)
+  lockedUntil        DateTime? @db.Timestamptz(6)
+  isActive           Boolean   @default(true)
+  lastLoginAt        DateTime? @db.Timestamptz(6)
+  createdAt          DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @db.Timestamptz(6)
 
   memberships           StaffMembership[]
   assignedConversations Conversation[]
