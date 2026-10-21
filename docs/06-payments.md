@@ -80,6 +80,8 @@ stateDiagram-v2
   end note
 ```
 
+**Retry decision (Stage 5).** The diagram's arrow `FAILED --> PENDING` says "new authorisation on same reference", but §4.1 says a reference is never reused. The build follows §4.1: a retry creates a new `Payment` with a new reference for the order total, and the failed payment stays `FAILED`. At most one payment is open per order; a retry while one is open resumes it. Retries lock the order row. A retry is refused once the order is paid, is no longer `PENDING_PAYMENT`, or its reservation has expired. See `retry.ts` and `tests/db/payment-retry.test.ts`.
+
 **Order interaction.** The order stays `PENDING_PAYMENT` while the payment is `INITIALIZED`, `PENDING` or `FAILED` within the reservation window. Expiry releases stock and moves the order to `CANCELLED` only after a final verification call.
 
 ---

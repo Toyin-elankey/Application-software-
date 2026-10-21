@@ -275,7 +275,7 @@ All JSON APIs live under `/api/v1`. Errors use RFC 9457 `application/problem+jso
 | DELETE | `/cart/items/{variantId}` | Cart cookie | Remove |
 | POST | `/delivery/quote` | Cart cookie | Fee and estimate label for a state |
 | POST | `/checkout` | Cart cookie | Create order `PENDING_PAYMENT` (idempotent) |
-| POST | `/orders/{orderId}/payments` | Cart or customer | Initialise or resume payment (idempotent) |
+| POST | `/orders/{orderNumber}/payments` | Customer session (or lookup session for that order) | Start a new payment after a failed one, or resume the open one (idempotent). Built in Stage 5; the path uses the order number, see `07` Stage 5 |
 | GET | `/orders/{orderNumber}` | Lookup or customer session | Order status and timeline (after verification) |
 
 ### 6.2 Customer identity
@@ -289,7 +289,7 @@ All JSON APIs live under `/api/v1`. Errors use RFC 9457 `application/problem+jso
 | POST | `/me/orders/{orderId}/cancel` | Customer session + recent OTP | Cancel where allowed |
 | POST | `/me/consents` | Customer session | Grant or withdraw a consent purpose |
 
-Built in Stage 5 (customer OTP and order lookup): `POST /api/v1/auth/otp/request`, `POST /api/v1/auth/otp/verify`, `POST /api/v1/auth/logout` and `GET /api/v1/orders/{orderNumber}`. The paths above are shown without the `/api/v1` prefix. The other rows in this table are not built yet. Status and limits: `07` Stage 5.
+Built in Stage 5 (customer OTP and order lookup): `POST /api/v1/auth/otp/request`, `POST /api/v1/auth/otp/verify`, `POST /api/v1/auth/logout`, `GET /api/v1/orders/{orderNumber}` and `POST /api/v1/orders/{orderNumber}/payments` (the payment retry). The paths above are shown without the `/api/v1` prefix. The other rows in this table are not built yet. Status and limits: `07` Stage 5.
 
 ### 6.3 Assistant
 
