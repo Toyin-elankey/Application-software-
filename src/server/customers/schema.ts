@@ -24,3 +24,12 @@ export const OtpVerifySchema = z.discriminatedUnion('purpose', [
   z.object({ purpose: z.literal('CUSTOMER_LOGIN'), phoneE164: PhoneSchema, code: CodeSchema }).strict(),
   z.object({ purpose: z.literal('ORDER_LOOKUP'), orderNumber: OrderNumberSchema, code: CodeSchema }).strict(),
 ]);
+
+// Account bodies (02 §6.2). Each rejects unknown fields.
+export const CONSENT_PURPOSE_VALUES = ['ORDER_UPDATES_WHATSAPP', 'MARKETING_WHATSAPP', 'AI_ASSISTANT_PROCESSING', 'TERMS_AND_PRIVACY'] as const;
+
+export const ConsentBodySchema = z
+  .object({ purpose: z.enum(CONSENT_PURPOSE_VALUES), granted: z.boolean() })
+  .strict();
+
+export const CancelBodySchema = z.object({ code: CodeSchema }).strict();

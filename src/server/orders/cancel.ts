@@ -4,21 +4,27 @@ import { AppError } from '@/server/http/problem';
 import { canTransition } from './stateMachine';
 
 // Cancels an order that is still awaiting payment and releases its reservation (FR-CHK-04, 06 §4.5).
-// Shared by the reservation-expiry sweep and by staff. Locks Payment rows before the Order row, the
+// Shared by the reservation-expiry sweep, by staff and by the customer (FR-ORD-06). Locks Payment rows before the Order row, the
 // same order the payment confirmation path uses, so the two cannot deadlock. The caller runs this inside
 // its own transaction and writes any audit row in that same transaction.
 
 export type CancelOptions = {
   now: Date;
-  reason: 'payment_timeout' | 'cancelled_by_staff';
-  failureReason: 'reservation_expired' | 'cancelled_by_staff';
-  actorType: 'SYSTEM' | 'STAFF';
+  reason: 'payment_timeout' | 'cancelled_by_staff' | 'cancelled_by_customer';
+  failureReason: 'reservation_expired' | 'cancelled_by_staff' | 'cancelled_by_customer';
+  actorType: 'SYSTEM' | 'STAFF' | 'CUSTOMER';
   actorId: string | null;
   /** When set, the order must still be at this version (If-Match). */
   expectedVersion?: number;
 };
 
 export type CancelOutcome = 'cancelled' | 'already_paid' | 'not_pending';
+
+const NOTES: Record<CancelOptions['reason'], string> = {
+  payment_timeout: 'reservation expired',
+  cancelled_by_staff: 'cancelled by staff',
+  cancelled_by_customer: 'cancelled by customer',
+};
 
 export async function cancelUnpaidOrderTx(
   tx: Prisma.TransactionClient,
@@ -70,7 +76,7 @@ export async function cancelUnpaidOrderTx(
         orderId,
         actorType: options.actorType,
         actorStaffId: options.actorType === 'STAFF' ? options.actorId : null,
-        note: options.reason === 'payment_timeout' ? 'reservation expired' : 'cancelled by staff',
+        note: NOTES[options.reason],
       },
     });
   }

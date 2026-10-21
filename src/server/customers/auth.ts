@@ -9,7 +9,7 @@ import { openCustomerSession, revokeCustomerSession, type CustomerAccess } from 
 
 export type CustomerRequestMeta = { ip: string | null; userAgent: string | null };
 
-async function customerAudit(
+export async function customerAudit(
   tx: Prisma.TransactionClient | PrismaClient,
   businessId: string,
   customerId: string,
@@ -18,6 +18,7 @@ async function customerAudit(
   entityId: string,
   meta: CustomerRequestMeta,
   now: Date,
+  changes?: Prisma.InputJsonValue,
 ): Promise<void> {
   await tx.auditLog.create({
     data: {
@@ -27,6 +28,7 @@ async function customerAudit(
       action,
       entityType,
       entityId,
+      changes,
       ip: meta.ip,
       userAgent: meta.userAgent,
       createdAt: now,
