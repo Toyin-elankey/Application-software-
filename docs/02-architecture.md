@@ -289,6 +289,8 @@ All JSON APIs live under `/api/v1`. Errors use RFC 9457 `application/problem+jso
 | POST | `/me/orders/{orderId}/cancel` | Customer session + recent OTP | Cancel where allowed |
 | POST | `/me/consents` | Customer session | Grant or withdraw a consent purpose |
 
+Built in Stage 5 (customer OTP and order lookup): `POST /api/v1/auth/otp/request`, `POST /api/v1/auth/otp/verify`, `POST /api/v1/auth/logout` and `GET /api/v1/orders/{orderNumber}`. The paths above are shown without the `/api/v1` prefix. The other rows in this table are not built yet. Status and limits: `07` Stage 5.
+
 ### 6.3 Assistant
 
 | Method | Path | Auth | Purpose |
