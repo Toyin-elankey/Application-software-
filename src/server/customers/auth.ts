@@ -43,7 +43,7 @@ export async function signInWithOtp(
   options: { now?: Date; key?: string } = {},
 ): Promise<{ token: string; expiresAt: Date }> {
   const now = options.now ?? new Date();
-  await verifyOtp(db, { businessId: input.businessId, purpose: 'CUSTOMER_LOGIN', phoneE164: input.phoneE164, code: input.code }, options);
+  await verifyOtp(db, { businessId: input.businessId, purpose: 'CUSTOMER_LOGIN', phoneE164: input.phoneE164, code: input.code, ip: input.ip }, options);
 
   return db.$transaction(async (tx) => {
     const existing = await tx.customer.findUnique({
@@ -84,7 +84,7 @@ export async function grantOrderLookup(
 
   await verifyOtp(
     db,
-    { businessId: input.businessId, purpose: 'ORDER_LOOKUP', phoneE164: order.customer.phoneE164, code: input.code },
+    { businessId: input.businessId, purpose: 'ORDER_LOOKUP', phoneE164: order.customer.phoneE164, code: input.code, ip: input.ip },
     options,
   );
 

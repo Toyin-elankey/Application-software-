@@ -62,14 +62,14 @@ export async function requestCancelCode(
   db: PrismaClient,
   sender: OtpSender,
   scope: TenantScope,
-  input: { customerId: string; orderNumber: string },
+  input: { customerId: string; orderNumber: string; ip?: string | null },
   options: { now?: Date; key?: string } = {},
 ): Promise<OtpRequestResult> {
   const order = await loadOwnedOrder(db, scope, input.customerId, input.orderNumber);
   if (!customerMayCancel(order.status)) {
     throw new AppError(422, 'order_not_cancellable', 'This order can no longer be cancelled here. Please contact the shop.');
   }
-  return requestOtp(db, sender, { businessId: scope.businessId, purpose: 'ORDER_CANCEL', phoneE164: order.phoneE164 }, options);
+  return requestOtp(db, sender, { businessId: scope.businessId, purpose: 'ORDER_CANCEL', phoneE164: order.phoneE164, ip: input.ip }, options);
 }
 
 export type CustomerCancelResult = { orderNumber: string; status: 'CANCELLED' | 'REFUND_PENDING'; refundPending: boolean };
@@ -92,7 +92,7 @@ export async function cancelOrderAsCustomer(
     throw new AppError(422, 'order_not_cancellable', 'This order can no longer be cancelled here. Please contact the shop.');
   }
 
-  await verifyOtp(db, { businessId: scope.businessId, purpose: 'ORDER_CANCEL', phoneE164: order.phoneE164, code: input.code }, options);
+  await verifyOtp(db, { businessId: scope.businessId, purpose: 'ORDER_CANCEL', phoneE164: order.phoneE164, code: input.code, ip: input.ip }, options);
 
   return db.$transaction(
     async (tx) => {

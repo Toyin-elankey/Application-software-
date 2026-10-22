@@ -11,6 +11,7 @@ The authoritative schema draft is [`prisma/schema.prisma`](../prisma/schema.pris
 | Tenancy and settings | `Business`, `BusinessSettings` | Branding, contact, policy text, VAT, reservation window, AI switch |
 | Staff and roles | `StaffUser`, `StaffMembership` | Role is per business membership, which allows one person across several brands later |
 | Customers and consent | `Customer`, `CustomerSession`, `OtpChallenge`, `ConsentRecord`, `Address` | Phone-first identity. Consent is append-only |
+| Rate limits | `RateLimitEvent` | One row per allowed event in a per-IP window. Rows older than their window are pruned when the bucket is next used. A retention sweep for idle buckets is not yet built |
 | Catalogue | `Category`, `Product`, `ProductImage`, `ProductOption`, `ProductOptionValue`, `ProductVariant`, `VariantOptionValue` | Options generate variants; a variant is the sellable unit with SKU, price and stock |
 | Inventory | `ProductVariant.onHand/reserved`, `InventoryMovement` | Cached balances plus an append-only ledger |
 | Delivery | `DeliveryZone`, `Shipment`, `DeliveryEvent` | Zones price shipping. Events form the delivery timeline |

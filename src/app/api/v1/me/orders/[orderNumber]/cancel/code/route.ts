@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { requireJsonRequest } from '@/server/auth/guard';
+import { clientMeta, requireJsonRequest } from '@/server/auth/guard';
 import { requireSignIn, requestCancelCode } from '@/server/customers/account';
 import { getOtpSender } from '@/server/customers/delivery';
 import { OrderNumberSchema } from '@/server/customers/schema';
@@ -22,7 +22,7 @@ export function POST(request: Request, context: { params: Promise<{ orderNumber:
     const { db, store } = await storeAndDb();
     const accesses = await accessesFromCookies(db, store.scope.businessId, request.headers.get('cookie'));
     const signIn = requireSignIn(accesses);
-    const result = await requestCancelCode(db, getOtpSender(), store.scope, { customerId: signIn.customerId, orderNumber });
+    const result = await requestCancelCode(db, getOtpSender(), store.scope, { customerId: signIn.customerId, orderNumber, ip: clientMeta(request).ip });
     return jsonResponse(result, 202, { 'Cache-Control': 'no-store' });
   });
 }

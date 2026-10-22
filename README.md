@@ -9,7 +9,7 @@ A commerce platform for one brand (multi-brand later) that combines a mobile-fir
 | Path | Contents |
 |---|---|
 | [`docs/`](docs/README.md) | Product requirements, architecture, data model, UI/UX wireframes, WhatsApp and AI design, payments design, MVP and roadmap |
-| [`prisma/schema.prisma`](prisma/schema.prisma) | MVP data model (40 models, 29 enums). Validated with Prisma 7.10.1. |
+| [`prisma/schema.prisma`](prisma/schema.prisma) | MVP data model (41 models, 29 enums). Validated with Prisma 7.10.1. |
 | [`prisma/migrations/`](prisma/migrations) | `0001_baseline` (generated from the schema) and `0002_sql_constraints` (hand-written CHECK, unique, partial and full-text objects from docs/03 §9) |
 | [`scripts/db/`](scripts/db) | Migration runner, seed (refuses production), baseline generator, test-database reset |
 | [`tests/db/`](tests/db) | Database tests: constraints, tenant isolation, seed |
