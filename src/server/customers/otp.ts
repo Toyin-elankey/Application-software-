@@ -1,4 +1,5 @@
 import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
+import { consumeRateLimit, rateBucket } from '@/server/http/ratelimit';
 import type { PrismaClient } from '@prisma/client';
 import { getEnv } from '@/lib/env';
 import { logger } from '@/lib/logger';
@@ -19,6 +20,10 @@ export const OTP_TTL_MS = 10 * 60 * 1000;
 export const OTP_MAX_ATTEMPTS = 5;
 export const OTP_COOLDOWN_MS = 60 * 1000;
 export const OTP_SENDS_PER_HOUR = 5;
+/** Per-IP limits across all phones (02 §8). Set above what one shared mobile-network address needs in a day. */
+export const OTP_IP_SENDS_PER_HOUR = 20;
+export const OTP_IP_VERIFIES_PER_WINDOW = 30;
+export const OTP_IP_VERIFY_WINDOW_MS = 10 * 60 * 1000;
 
 export type OtpPurposeName = 'CUSTOMER_LOGIN' | 'ORDER_LOOKUP' | 'ORDER_CANCEL';
 
@@ -70,13 +75,26 @@ export type OtpRequestResult = { accepted: true; expiresInSeconds: number };
 export async function requestOtp(
   db: PrismaClient,
   sender: OtpSender,
-  input: { businessId: string; purpose: OtpPurposeName; phoneE164: string | null },
+  input: { businessId: string; purpose: OtpPurposeName; phoneE164: string | null; ip?: string | null },
   options: { now?: Date; key?: string } = {},
 ): Promise<OtpRequestResult> {
   const now = options.now ?? new Date();
   // Read the key first, so a missing key fails the same way for every request, not only for known targets.
   const key = options.key ?? otpHmacKey();
   const answer: OtpRequestResult = { accepted: true, expiresInSeconds: OTP_TTL_MS / 1000 };
+  // Per-IP limit: counts every request from this address, whichever phone it names, so a caller cannot probe
+  // many numbers. A refused request gets the same answer and sends nothing. Checked before the target, so
+  // unknown and known numbers are limited alike.
+  if (input.ip) {
+    const allowed = await consumeRateLimit(db, {
+      businessId: input.businessId,
+      bucket: rateBucket(input.businessId, 'otp.send', input.ip),
+      limit: OTP_IP_SENDS_PER_HOUR,
+      windowMs: 60 * 60 * 1000,
+      now,
+    });
+    if (!allowed) return answer;
+  }
   if (!input.phoneE164) return answer;
   const target: OtpTarget = { businessId: input.businessId, phoneE164: input.phoneE164, purpose: input.purpose };
 
@@ -135,12 +153,24 @@ export async function requestOtp(
  */
 export async function verifyOtp(
   db: PrismaClient,
-  input: { businessId: string; purpose: OtpPurposeName; phoneE164: string; code: string },
+  input: { businessId: string; purpose: OtpPurposeName; phoneE164: string; code: string; ip?: string | null },
   options: { now?: Date; key?: string } = {},
 ): Promise<{ challengeId: string }> {
   const now = options.now ?? new Date();
   const key = options.key ?? otpHmacKey();
   const target: OtpTarget = { businessId: input.businessId, phoneE164: input.phoneE164, purpose: input.purpose };
+  // Per-IP limit on attempts from this address. A refused attempt is answered as an invalid code, and no
+  // challenge is touched, so it counts neither for nor against the code.
+  if (input.ip) {
+    const allowed = await consumeRateLimit(db, {
+      businessId: input.businessId,
+      bucket: rateBucket(input.businessId, 'otp.verify', input.ip),
+      limit: OTP_IP_VERIFIES_PER_WINDOW,
+      windowMs: OTP_IP_VERIFY_WINDOW_MS,
+      now,
+    });
+    if (!allowed) throw invalidCode();
+  }
 
   const challenge = await db.otpChallenge.findFirst({
     where: { businessId: target.businessId, phoneE164: target.phoneE164, purpose: target.purpose, consumedAt: null },

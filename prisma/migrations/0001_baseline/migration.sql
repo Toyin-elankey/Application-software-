@@ -161,6 +161,15 @@ CREATE TABLE "OtpChallenge" (
 );
 CREATE INDEX "OtpChallenge_businessId_phoneE164_purpose_createdAt_idx" ON "OtpChallenge"("businessId", "phoneE164", "purpose", "createdAt");
 
+CREATE TABLE "RateLimitEvent" (
+    "id" UUID NOT NULL,
+    "businessId" UUID NOT NULL,
+    "bucket" VARCHAR(160) NOT NULL,
+    "createdAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "RateLimitEvent_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX "RateLimitEvent_bucket_createdAt_idx" ON "RateLimitEvent"("bucket", "createdAt");
+
 CREATE TABLE "ConsentRecord" (
     "id" UUID NOT NULL,
     "businessId" UUID NOT NULL,
@@ -713,6 +722,7 @@ ALTER TABLE "StaffMembership" ADD CONSTRAINT "StaffMembership_staffUserId_fkey" 
 ALTER TABLE "Customer" ADD CONSTRAINT "Customer_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "CustomerSession" ADD CONSTRAINT "CustomerSession_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "OtpChallenge" ADD CONSTRAINT "OtpChallenge_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "RateLimitEvent" ADD CONSTRAINT "RateLimitEvent_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "ConsentRecord" ADD CONSTRAINT "ConsentRecord_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "ConsentRecord" ADD CONSTRAINT "ConsentRecord_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "Address" ADD CONSTRAINT "Address_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business"("id") ON DELETE CASCADE ON UPDATE CASCADE;

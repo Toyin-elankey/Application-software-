@@ -1,4 +1,4 @@
-import { requireJsonRequest } from '@/server/auth/guard';
+import { clientMeta, requireJsonRequest } from '@/server/auth/guard';
 import { getOtpSender } from '@/server/customers/delivery';
 import { requestOtp } from '@/server/customers/otp';
 import { OtpRequestSchema } from '@/server/customers/schema';
@@ -16,7 +16,7 @@ export function POST(request: Request) {
     const body = OtpRequestSchema.parse(await readJson(request));
     const { db, store } = await storeAndDb();
     const phoneE164 = await codeTargetPhone(db, store.scope, body);
-    const result = await requestOtp(db, getOtpSender(), { businessId: store.scope.businessId, purpose: body.purpose, phoneE164 });
+    const result = await requestOtp(db, getOtpSender(), { businessId: store.scope.businessId, purpose: body.purpose, phoneE164, ip: clientMeta(request).ip });
     return jsonResponse(result, 202);
   });
 }

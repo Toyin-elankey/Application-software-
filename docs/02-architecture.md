@@ -361,7 +361,7 @@ Staff sign-in uses Auth.js routes under `/api/auth/*`.
 | Area | Control | Verified by |
 |---|---|---|
 | Authentication, staff | Argon2id password hashing; lockout after repeated failures; `tokenVersion` revocation; idle and absolute session timeouts; MFA (TOTP) before production. | Auth tests: lockout, revoked token rejected, deactivated user rejected. |
-| Authentication, customers | OTP: 6 digits, 10-minute expiry, 5 attempts, 60 s cooldown, 5 sends per phone per hour. Hashed codes (HMAC with server key). Opaque session tokens stored as SHA-256 hashes. | Tests for brute force, reuse, expiry, cross-customer access. |
+| Authentication, customers | OTP: 6 digits, 10-minute expiry, 5 attempts, 60 s cooldown, 5 sends per phone per hour. Per IP: 20 sends per hour and 30 verify attempts per 10 minutes (`RateLimitEvent`; the rightmost `X-Forwarded-For` entry, see `07` Stage 5). Hashed codes (HMAC with server key). Opaque session tokens stored as SHA-256 hashes. | Tests for brute force, reuse, expiry, cross-customer access. |
 | Authorisation | Central permission map. Every route and service function checks permission and tenant. Customers see only their own orders. | Role matrix tests (PRD §8) as table-driven tests. |
 | Input validation | Zod at every boundary. Max lengths. Enum-only status values. Money as integers. Phone normalised to E.164. | Unit tests with malicious and boundary inputs. |
 | Output encoding | React escaping by default; no `dangerouslySetInnerHTML` for user content; markdown from the assistant rendered with a sanitiser. | Review checklist; XSS test payloads in product descriptions. |

@@ -278,6 +278,7 @@ model Business {
   shipments          Shipment[]
   deliveryEvents     DeliveryEvent[]
   jobs               Job[]
+  rateLimitEvents    RateLimitEvent[]
 }
 
 model BusinessSettings {
@@ -429,6 +430,19 @@ model OtpChallenge {
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, phoneE164, purpose, createdAt])
+}
+
+// Sliding-window counters for per-IP limits (02 §8). One row per allowed event. Rows older than the window
+// are deleted when the bucket is next used. Buckets name the business, the limit and the IP.
+model RateLimitEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @db.Uuid
+  bucket     String   @db.VarChar(160)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([bucket, createdAt])
 }
 
 // Append-only. Current consent = latest row per (customerId, purpose).

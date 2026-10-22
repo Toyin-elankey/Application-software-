@@ -35,10 +35,20 @@ export function staffClearCookie(): string {
   return parts.join('; ');
 }
 
+/**
+ * The client address from X-Forwarded-For. The rightmost entry is the one the nearest proxy saw; the leftmost
+ * is whatever the client sent, so it can be forged. Assumes one trusted proxy in front of the app, which
+ * appends to the header. Without the header there is no address, and per-IP limits do not apply.
+ */
+export function rightmostForwardedIp(header: string | null): string | null {
+  if (!header) return null;
+  const parts = header.split(',');
+  const last = parts[parts.length - 1]?.trim() ?? '';
+  return last ? last.slice(0, 64) : null;
+}
+
 export function clientMeta(request: Request): { ip: string | null; userAgent: string | null } {
-  const forwarded = request.headers.get('x-forwarded-for');
-  const ip = forwarded ? forwarded.split(',')[0].trim().slice(0, 64) : null;
-  return { ip, userAgent: request.headers.get('user-agent')?.slice(0, 255) ?? null };
+  return { ip: rightmostForwardedIp(request.headers.get('x-forwarded-for')), userAgent: request.headers.get('user-agent')?.slice(0, 255) ?? null };
 }
 
 /** State-changing requests must be JSON. A cross-site form cannot send application/json without a preflight. */
