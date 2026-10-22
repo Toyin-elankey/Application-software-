@@ -176,6 +176,7 @@ enum ConsentPurpose {
 enum OtpPurpose {
   CUSTOMER_LOGIN
   ORDER_LOOKUP
+  ORDER_CANCEL
 }
 
 enum DeliveryEventStatus {

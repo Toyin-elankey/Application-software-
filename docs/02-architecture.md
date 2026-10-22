@@ -282,14 +282,15 @@ All JSON APIs live under `/api/v1`. Errors use RFC 9457 `application/problem+jso
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| POST | `/auth/otp/request` | Public (rate-limited) | Send OTP for `CUSTOMER_LOGIN` or `ORDER_LOOKUP` |
+| POST | `/auth/otp/request` | Public (rate-limited) | Send OTP for `CUSTOMER_LOGIN` or `ORDER_LOOKUP`. The `ORDER_CANCEL` code is sent by `/me/orders/{orderNumber}/cancel/code` |
 | POST | `/auth/otp/verify` | Public (attempt-limited) | Verify OTP; issue session cookie |
 | POST | `/auth/logout` | Customer session | Revoke session |
 | GET | `/me/orders` | Customer session | Order history |
-| POST | `/me/orders/{orderId}/cancel` | Customer session + recent OTP | Cancel where allowed |
+| POST | `/me/orders/{orderNumber}/cancel/code` | Customer session | Send the code that authorises a cancel, to the phone on the order |
+| POST | `/me/orders/{orderNumber}/cancel` | Customer session + recent OTP (`{code}`) | Cancel where allowed: unpaid to `CANCELLED`, paid to `REFUND_PENDING` |
 | POST | `/me/consents` | Customer session | Grant or withdraw a consent purpose |
 
-Built in Stage 5 (customer OTP and order lookup): `POST /api/v1/auth/otp/request`, `POST /api/v1/auth/otp/verify`, `POST /api/v1/auth/logout`, `GET /api/v1/orders/{orderNumber}` and `POST /api/v1/orders/{orderNumber}/payments` (the payment retry). The paths above are shown without the `/api/v1` prefix. The other rows in this table are not built yet. Status and limits: `07` Stage 5.
+Built in Stage 5 (customer OTP and order lookup): `POST /api/v1/auth/otp/request`, `POST /api/v1/auth/otp/verify`, `POST /api/v1/auth/logout`, `GET /api/v1/orders/{orderNumber}` `POST /api/v1/orders/{orderNumber}/payments` (the payment retry), and the account routes `GET /api/v1/me/orders`, `POST /api/v1/me/orders/{orderNumber}/cancel/code`, `POST /api/v1/me/orders/{orderNumber}/cancel` and `POST /api/v1/me/consents`. The paths above are shown without the `/api/v1` prefix; the `{orderId}` in the cancel path is written `{orderNumber}` as in the other customer routes (see `07` Stage 5). The other rows in this table are not built yet. Status and limits: `07` Stage 5.
 
 ### 6.3 Assistant
 

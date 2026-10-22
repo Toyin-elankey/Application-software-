@@ -20,7 +20,7 @@ export const OTP_MAX_ATTEMPTS = 5;
 export const OTP_COOLDOWN_MS = 60 * 1000;
 export const OTP_SENDS_PER_HOUR = 5;
 
-export type OtpPurposeName = 'CUSTOMER_LOGIN' | 'ORDER_LOOKUP';
+export type OtpPurposeName = 'CUSTOMER_LOGIN' | 'ORDER_LOOKUP' | 'ORDER_CANCEL';
 
 const DEV_KEY_MATERIAL = 'development-only-otp-hmac-key';
 
