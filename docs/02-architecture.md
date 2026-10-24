@@ -343,6 +343,8 @@ Built in Stage 5 (customer OTP and order lookup): `POST /api/v1/auth/otp/request
 | GET | `/admin/audit-logs` | `audit.read` |
 | GET | `/admin/webhook-events` | `ops.read` |
 
+**Permission names as implemented.** The matrix in `src/server/auth/permissions.ts` is the source of truth, and some names in the table above were renamed when the routes were built. Stage 5 read routes use the implemented names: `/admin/overview` → `overview.view` (roles OWNER, ADMIN, MANAGER, FINANCE, VIEWER); `/admin/orders` → `orders.view` (all roles); `/admin/customers` → `customers.view_masked` (OWNER, ADMIN, MANAGER, SUPPORT, VIEWER; the full value needs `customers.reveal_pii`, not `pii.reveal`); `/admin/payments` → `payments.view` (OWNER, ADMIN, MANAGER, FINANCE, VIEWER); `/admin/audit-logs` → `audit.view` (OWNER, ADMIN, VIEWER). Where this table and the code differ, the code is what is enforced.
+
 Staff sign-in uses Auth.js routes under `/api/auth/*`.
 
 ---
