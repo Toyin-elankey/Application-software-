@@ -340,6 +340,7 @@ Built in Stage 5 (customer OTP and order lookup): `POST /api/v1/auth/otp/request
 | GET / PUT | `/admin/settings` | `settings.write` |
 | CRUD | `/admin/delivery-zones` | `settings.write` |
 | CRUD | `/admin/staff` | `staff.manage` |
+| POST | `/admin/staff/{id}/password-reset` | `staff.manage` (Owner only; not for one's own account; the member must be active) | Issues a one-time temporary password, returned once. The old password stops working, every session of the member ends, the lockout clears, and the member must change the password at next sign-in. MFA is unchanged. |
 | GET | `/admin/audit-logs` | `audit.read` |
 | GET | `/admin/webhook-events` | `ops.read` |
 
