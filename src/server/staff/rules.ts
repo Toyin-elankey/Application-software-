@@ -53,3 +53,18 @@ export function assertCanChangeStaff(input: { actorId: string; actorRole: StaffR
     assertCanGrant(actorRole, change.role);
   }
 }
+
+/**
+ * An Owner issues a temporary password for a member who has forgotten theirs. Nobody resets their own
+ * password here (they use the password change), and a deactivated account is reactivated first.
+ */
+export function assertCanResetPassword(input: { actorId: string; actorRole: StaffRoleName; target: StaffTarget }): void {
+  const { actorId, actorRole, target } = input;
+  assertCanManageStaff(actorRole);
+  if (target.id === actorId) {
+    throw new AppError(422, 'use_password_change', 'To change your own password, use the password change page.');
+  }
+  if (!target.isActive) {
+    throw new AppError(422, 'staff_inactive', 'Reactivate this account before resetting its password.');
+  }
+}

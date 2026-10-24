@@ -4,7 +4,7 @@ import { hashPassword } from '@/server/auth/password';
 import { audit, type StaffActor } from '@/server/auth/staff';
 import type { StaffRoleName } from '@/server/auth/permissions';
 import { AppError } from '@/server/http/problem';
-import { assertCanChangeStaff, assertCanCreateStaff, assertCanManageStaff, type StaffChange } from './rules';
+import { assertCanChangeStaff, assertCanCreateStaff, assertCanManageStaff, assertCanResetPassword, type StaffChange } from './rules';
 
 // Staff management (FR-ADM-10, 02 §6.5 `/admin/staff`). Every write runs in one transaction, ends the
 // affected sessions where needed, and writes an AuditLog row. Passwords and hashes never leave this file
@@ -66,10 +66,11 @@ function isUniqueViolation(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'P2002';
 }
 
-/** Ends every live session of a staff member and bumps tokenVersion, so the change takes effect on the next request. */
-async function endAllSessions(tx: Prisma.TransactionClient, staffUserId: string, now: Date): Promise<void> {
+/** Ends every live session of a staff member and bumps tokenVersion, so the change takes effect on the next request. Returns how many sessions ended. */
+async function endAllSessions(tx: Prisma.TransactionClient, staffUserId: string, now: Date): Promise<number> {
   await tx.staffUser.update({ where: { id: staffUserId }, data: { tokenVersion: { increment: 1 } } });
-  await tx.staffSession.updateMany({ where: { staffUserId, revokedAt: null }, data: { revokedAt: now } });
+  const ended = await tx.staffSession.updateMany({ where: { staffUserId, revokedAt: null }, data: { revokedAt: now } });
+  return ended.count;
 }
 
 async function loadMember(tx: Prisma.TransactionClient | PrismaClient, businessId: string, staffUserId: string): Promise<StaffMemberView> {
@@ -172,5 +173,44 @@ export async function updateStaffMember(
     }
 
     return loadMember(tx, actor.businessId, staffUserId);
+  });
+}
+
+/**
+ * Issues a new temporary password for a member who has forgotten theirs (Owner only). The old password stops
+ * working at once, every session of the member ends, the lockout clears, and the member must choose a new
+ * password at next sign-in. The new password is returned once, in this response. MFA is not changed: the
+ * member still needs their authenticator.
+ */
+export async function resetStaffPassword(
+  db: PrismaClient,
+  actor: StaffActor,
+  staffUserId: string,
+  now = new Date(),
+): Promise<StaffMemberView & { temporaryPassword: string }> {
+  assertCanManageStaff(actor.role);
+  const temporaryPassword = randomBytes(18).toString('base64url');
+  const passwordHash = await hashPassword(temporaryPassword);
+  return db.$transaction(async (tx) => {
+    // Same lock as the other staff writes: a reset and a role change for one person run one after the other.
+    await tx.$queryRaw`SELECT id FROM "StaffUser" WHERE id = ${staffUserId}::uuid FOR UPDATE`;
+    const membership = await tx.staffMembership.findFirst({
+      where: { businessId: actor.businessId, staffUserId },
+      select: { role: true, staffUser: { select: { id: true, isActive: true } } },
+    });
+    if (!membership) throw new AppError(404, 'staff_not_found', 'Staff member not found.');
+    assertCanResetPassword({
+      actorId: actor.staffUserId,
+      actorRole: actor.role,
+      target: { id: staffUserId, role: membership.role, isActive: membership.staffUser.isActive },
+    });
+
+    await tx.staffUser.update({
+      where: { id: staffUserId },
+      data: { passwordHash, mustChangePassword: true, failedLoginCount: 0, lockedUntil: null },
+    });
+    const sessionsEnded = await endAllSessions(tx, staffUserId, now);
+    await audit(tx, actor.businessId, actor.staffUserId, 'STAFF_PASSWORD_RESET', 'StaffUser', staffUserId, { sessionsEnded }, actor.ip, actor.userAgent, now);
+    return { ...(await loadMember(tx, actor.businessId, staffUserId)), temporaryPassword };
   });
 }

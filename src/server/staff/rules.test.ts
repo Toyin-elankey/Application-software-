@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AppError } from '@/server/http/problem';
 import type { StaffRoleName } from '@/server/auth/permissions';
-import { assertCanChangeStaff, assertCanCreateStaff, type StaffChange } from './rules';
+import { assertCanChangeStaff, assertCanCreateStaff, assertCanResetPassword, type StaffChange } from './rules';
 
 // Staff management policy (FR-ADM-10, PRD §8). Each case names the rule it proves.
 
@@ -90,5 +90,33 @@ describe('changing staff', () => {
 
   it('does not treat an unchanged role as a grant', () => {
     expect(change('OWNER', { role: 'SUPPORT' }, { role: 'SUPPORT' })).toBe('ok');
+  });
+});
+
+describe('resetting a forgotten password (Owner only)', () => {
+  const reset = (actorRole: StaffRoleName, target: { id?: string; role?: StaffRoleName; isActive?: boolean }, actorId = OWNER_ID) =>
+    outcome(() =>
+      assertCanResetPassword({
+        actorId,
+        actorRole,
+        target: { id: target.id ?? OTHER_ID, role: target.role ?? 'ADMIN', isActive: target.isActive ?? true },
+      }),
+    );
+
+  it('lets an Owner reset an active member, including another Owner', () => {
+    expect(reset('OWNER', { role: 'ADMIN' })).toBe('ok');
+    expect(reset('OWNER', { role: 'OWNER' })).toBe('ok');
+  });
+
+  it('refuses anyone below Owner, with 403 forbidden', () => {
+    expect(reset('ADMIN', { role: 'VIEWER' })).toEqual({ status: 403, code: 'forbidden' });
+  });
+
+  it('refuses a self-reset, which goes through the password change instead', () => {
+    expect(reset('OWNER', { id: OWNER_ID, role: 'OWNER' }, OWNER_ID)).toEqual({ status: 422, code: 'use_password_change' });
+  });
+
+  it('refuses a deactivated account; it must be reactivated first', () => {
+    expect(reset('OWNER', { role: 'ADMIN', isActive: false })).toEqual({ status: 422, code: 'staff_inactive' });
   });
 });
