@@ -4,6 +4,21 @@ A commerce platform for one brand (multi-brand later) that combines a mobile-fir
 
 > **Current status: Stage 2 (data layer), built on Stage 1.** The repository has a Next.js app with a placeholder storefront and a health check, a database schema with migrations, seed data and tests against a real PostgreSQL, plus Docker, CI and test setup. It has no commerce features yet, and no connection to WhatsApp, Paystack or an AI provider. The status of each area is tracked in [`docs/07-mvp-and-roadmap.md`](docs/07-mvp-and-roadmap.md) §1.
 
+
+## Application Screenshots
+
+### Customer Storefront
+![Storefront](docs/screenshots/storefront.png)
+
+### Admin Dashboard
+![Admin Dashboard](docs/screenshots/admin.png)
+
+### WhatsApp Integration
+![WhatsApp](docs/screenshots/whatsapp.png)
+
+### System Architecture
+![Architecture](docs/screenshots/architecture.png)
+
 ## What is here now
 
 | Path | Contents |
